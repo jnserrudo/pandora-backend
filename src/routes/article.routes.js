@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { createArticle, getAllArticles, getArticleBySlug, updateArticle, deleteArticle } from '../controllers/article.controller.js';
+import { authenticateToken } from '../middlewares/auth.middleware.js';
+import { authorizeRole } from '../middlewares/authorize.middleware.js';
+const router = Router();
+router.get('/articles', getAllArticles);
+router.get('/articles/:slug', getArticleBySlug);
+router.post('/articles', authenticateToken, authorizeRole(['ADMIN']), createArticle);
+router.put('/articles/:id', authenticateToken, authorizeRole(['ADMIN']), updateArticle);
+router.delete('/articles/:id', authenticateToken, authorizeRole(['ADMIN']), deleteArticle);
+export default router;

@@ -1,0 +1,12 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+/generated/prisma
+# Prisma
+/prisma/migrations/ # Generalmente se versionan las migraciones, pero si no quieres que apuntes.txt se suba, es un buen lugar
+*.db # Para bases de datos sqlite locales si se usaran
+
+# Personal notes
+apuntes.txt
+/src/generated/prisma

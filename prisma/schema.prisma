@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int     @id @default(autoincrement())
+  username     String  @unique
+  email        String  @unique
+  password     String
+  name         String
+  role         Role    @default(USER)
+  refreshToken String? @db.Text
+
+  commerce  Commerce?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Commerce {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String  @db.Text
+  address     String
+  phone       String?
+  coverImage  String?
+
+  owner   User @relation(fields: [ownerId], references: [id])
+  ownerId Int  @unique
+
+  events    Event[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Article {
+  id         Int      @id @default(autoincrement())
+  title      String
+  slug       String   @unique
+  subtitle   String?
+  content    String   @db.Text
+  coverImage String
+  status     Status   @default(DRAFT)
+  category   Category
+
+  authorName String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String   @db.Text
+  startDate   DateTime
+  endDate     DateTime
+
+  commerce   Commerce @relation(fields: [commerceId], references: [id])
+  commerceId Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  USER
+  OWNER
+  ADMIN
+}
+
+enum Status {
+  DRAFT
+  PUBLISHED
+}
+
+enum Category {
+  ENTREVISTA
+  GUIA
+  REPORTAJE
+  GASTRONOMIA
+  NOCTURNO
+}
