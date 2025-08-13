@@ -1,13 +1,26 @@
 import * as userModel from '../models/user.model.js';
-export const getCurrentUser = async (req, res) => {
+
+/**
+ * Obtiene el perfil del usuario actualmente autenticado.
+ */
+export const getMyProfile = async (req, res) => {
     try {
-        const user = await userModel.getCurrentUserModel(req.user.id);
-        res.status(200).json(user);
-    } catch (error) { res.status(error.statusCode || 500).json({ message: error.message }); }
+        // req.user.id es añadido por el middleware authenticateToken
+        const userProfile = await userModel.getUserProfileModel(req.user.id);
+        res.status(200).json(userProfile);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ message: error.message });
+    }
 };
-export const updateCurrentUser = async (req, res) => {
+
+/**
+ * Actualiza el perfil del usuario actualmente autenticado.
+ */
+export const updateMyProfile = async (req, res) => {
     try {
-        const user = await userModel.updateCurrentUserModel(req.user.id, req.body);
-        res.status(200).json({ message: 'Profile updated successfully', user });
-    } catch (error) { res.status(error.statusCode || 500).json({ message: error.message }); }
+        const updatedUser = await userModel.updateUserProfileModel(req.user.id, req.body);
+        res.status(200).json(updatedUser);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ message: error.message });
+    }
 };

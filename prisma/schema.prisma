@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,6 +6,8 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
+
+// --- MODELOS DE AUTENTICACIÓN Y USUARIOS ---
 
 model User {
   id           Int     @id @default(autoincrement())
@@ -22,40 +18,55 @@ model User {
   role         Role    @default(USER)
   refreshToken String? @db.Text
 
+  // Relación con el comercio que posee
   commerce  Commerce?
+  // -- RELACIÓN OPUESTA AÑADIDA --
+  // Un usuario puede escribir muchos artículos
+  articles  Article[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
 
+enum Role {
+  USER // Consumidor final
+  OWNER // Dueño de un comercio
+  ADMIN // Administrador de Pandora
+}
+
+// --- MODELOS DE NEGOCIO PRINCIPALES ---
+
 model Commerce {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique
-  description String  @db.Text
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String           @db.Text
   address     String
   phone       String?
-  coverImage  String?
+  category    CommerceCategory
 
+  // -- Campos para Perfil Completo (MVP) --
+  galleryImages Json // Antes: String[]. Json es más flexible y estándar
+  website       String?
+  instagram     String?
+  facebook      String?
+
+  // -- Campos para Funcionalidades Futuras --
+  latitude     Float? // Para mapas
+  longitude    Float? // Para mapas
+  openingHours Json? // Para horarios complejos (ej. L-V: 9-18, S: 10-14)
+  isVerified   Boolean        @default(false) // Para la insignia "Socio Pandora"
+  status       CommerceStatus @default(ACTIVE) // Para activar/desactivar locales
+
+  // -- Relaciones --
   owner   User @relation(fields: [ownerId], references: [id])
   ownerId Int  @unique
 
-  events    Event[]
+  events Event[]
+
+  // -- Relación con Suscripción (Futuro) --
+  subscription Subscription?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model Article {
-  id         Int      @id @default(autoincrement())
-  title      String
-  slug       String   @unique
-  subtitle   String?
-  content    String   @db.Text
-  coverImage String
-  status     Status   @default(DRAFT)
-  category   Category
-
-  authorName String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
 }
 
 model Event {
@@ -64,7 +75,14 @@ model Event {
   description String   @db.Text
   startDate   DateTime
   endDate     DateTime
+  coverImage  String?
 
+  // -- Campos para Funcionalidades Futuras --
+  ticketUrl String? // Link para comprar entradas
+  price     Decimal?    @db.Decimal(10, 2) // Precio del evento
+  status    EventStatus @default(SCHEDULED) // Para manejar el estado del evento
+
+  // -- Relaciones --
   commerce   Commerce @relation(fields: [commerceId], references: [id])
   commerceId Int
 
@@ -72,21 +90,83 @@ model Event {
   updatedAt DateTime @updatedAt
 }
 
-enum Role {
-  USER
-  OWNER
-  ADMIN
+model Article {
+  id         Int           @id @default(autoincrement())
+  title      String
+  slug       String        @unique
+  subtitle   String?
+  content    String        @db.Text
+  coverImage String
+  status     PublishStatus @default(DRAFT)
+
+  // -- Relaciones --
+  category   ArticleCategory @relation(fields: [categoryId], references: [id])
+  categoryId Int
+
+  // -- Campos Futuros --
+  author     User?  @relation(fields: [authorId], references: [id]) // Relacionar con un autor (ADMIN)
+  authorId   Int?
+  authorName String // Mantenemos por si el autor no es un usuario
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-enum Status {
+// --- MODELOS DE SOPORTE Y RELACIONES ---
+
+model ArticleCategory {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  slug     String    @unique // Bueno para URLs amigables
+  articles Article[]
+}
+
+// --- MODELOS PARA MONETIZACIÓN FUTURA ---
+
+model Subscription {
+  id     String             @id @default(cuid())
+  planId String // ej. "plan_plus", "plan_premium"
+  status SubscriptionStatus
+
+  startDate DateTime
+  endDate   DateTime
+
+  commerce   Commerce @relation(fields: [commerceId], references: [id])
+  commerceId Int      @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- ENUMS ---
+
+enum CommerceCategory {
+  VIDA_NOCTURNA
+  GASTRONOMIA
+  SALAS_Y_TEATRO
+}
+
+enum CommerceStatus {
+  ACTIVE // Visible para todos
+  INACTIVE // Oculto (ej. cerrado por vacaciones)
+  PENDING // Esperando aprobación del admin
+  REJECTED // Rechazado por el admin
+}
+
+enum EventStatus {
+  SCHEDULED // Programado
+  CANCELLED // Cancelado
+  FINISHED // Finalizado
+}
+
+enum PublishStatus {
   DRAFT
   PUBLISHED
 }
 
-enum Category {
-  ENTREVISTA
-  GUIA
-  REPORTAJE
-  GASTRONOMIA
-  NOCTURNO
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE // Pago vencido
 }

@@ -1,32 +1,71 @@
 import prisma from '../db/prismaClient.js';
+import { throwError } from '../utils/error.utils.js';
 
-const throwError = (message, statusCode) => {
-    const error = new Error(message);
-    error.statusCode = statusCode;
-    throw error;
-};
-
-export const getCurrentUserModel = async (userId) => {
+/**
+ * Obtiene el perfil público de un usuario por su ID.
+ * Se excluyen datos sensibles como la contraseña y el refresh token.
+ * @param {number} userId - El ID del usuario.
+ * @returns {Promise<Object>} El perfil del usuario.
+ */
+export const getUserProfileModel = async (userId) => {
     const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, username: true, name: true, role: true, createdAt: true },
+        where: { id: parseInt(userId) },
+        select: {
+            id: true,
+            username: true,
+            email: true,
+            name: true,
+            role: true,
+            createdAt: true,
+        },
     });
-    if (!user) throwError('User not found.', 404);
+
+    if (!user) {
+        throwError('User not found.', 404);
+    }
     return user;
 };
 
-export const updateCurrentUserModel = async (userId, updateData) => {
-    const { role, password, ...allowedUpdates } = updateData;
-    if (allowedUpdates.username || allowedUpdates.email) {
+/**
+ * Actualiza el perfil de un usuario.
+ * @param {number} userId - El ID del usuario a actualizar.
+ * @param {object} data - Los datos a actualizar.
+ * @returns {Promise<Object>} El perfil actualizado.
+ */
+export const updateUserProfileModel = async (userId, data) => {
+    // Excluimos campos que un usuario no debería poder cambiar directamente.
+    const { id, role, password, ...updateData } = data;
+
+    // Opcional: Verificar si el nuevo email o username ya está en uso por otro usuario.
+    if (updateData.email || updateData.username) {
         const existingUser = await prisma.user.findFirst({
-            where: { OR: [{ email: allowedUpdates.email }, { username: allowedUpdates.username }], NOT: { id: userId } },
+            where: {
+                OR: [{ email: updateData.email }, { username: updateData.username }],
+                NOT: { id: parseInt(userId) },
+            },
         });
-        if (existingUser) throwError(existingUser.email === allowedUpdates.email ? 'Email is already taken.' : 'Username is already taken.', 409);
+        if (existingUser) {
+            const message = existingUser.email === updateData.email ? 'Email is already taken.' : 'Username is already taken.';
+            throwError(message, 409);
+        }
     }
-    const updatedUser = await prisma.user.update({
-        where: { id: userId },
-        data: allowedUpdates,
-        select: { id: true, email: true, username: true, name: true, role: true },
-    });
-    return updatedUser;
+
+    try {
+        return await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: updateData,
+            select: { // Devolvemos el perfil sin datos sensibles
+                id: true,
+                username: true,
+                email: true,
+                name: true,
+                role: true,
+            },
+        });
+    } catch (error) {
+        if (error.code === 'P2025') {
+            throwError('User not found.', 404);
+        }
+        throw error;
+    }
 };
