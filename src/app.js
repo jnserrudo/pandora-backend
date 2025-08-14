@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors'; // <-- 1. IMPORTA EL PAQUETE
+
 import prisma from './db/prismaClient.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
@@ -12,6 +14,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(cors()); // <-- 2. APLICA EL MIDDLEWARE
+
 app.get('/', (req, res) => res.send('Welcome to the API!'));
 
 // API Routes
