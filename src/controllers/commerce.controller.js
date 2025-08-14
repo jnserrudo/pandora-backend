@@ -6,7 +6,7 @@ export const getCommerces = async (req, res) => {
     const { category } = req.query;
     try {
         const commerces = category
-            ? await commerceModel.getCommercesByCategoryModel(category.toUpperCase())
+            ? await commerceModel.getCommercesByCategoryModel(category) // Pasamos el string tal cual
             : await commerceModel.getAllCommercesModel();
         res.status(200).json(commerces);
     } catch (error) {

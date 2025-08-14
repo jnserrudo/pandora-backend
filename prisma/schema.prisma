@@ -1,5 +1,7 @@
 generator client {
   provider = "prisma-client-js"
+    previewFeatures = ["fullTextSearch", "fullTextIndex"]
+
 }
 
 datasource db {
@@ -67,6 +69,8 @@ model Commerce {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // --- ÍNDICE DE TEXTO COMPLETO AÑADIDO ---
+  @@fulltext([name, description])
 }
 
 model Event {
@@ -88,6 +92,8 @@ model Event {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // --- ÍNDICE DE TEXTO COMPLETO AÑADIDO ---
+  @@fulltext([name, description])
 }
 
 model Article {
@@ -110,6 +116,8 @@ model Article {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // --- ÍNDICE DE TEXTO COMPLETO AÑADIDO ---
+  @@fulltext([title, subtitle, content])
 }
 
 // --- MODELOS DE SOPORTE Y RELACIONES ---

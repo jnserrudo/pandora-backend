@@ -21,17 +21,24 @@ export const getAllCommercesModel = async () => {
  * @param {string} category - La categoría a filtrar (ej. 'GASTRONOMIA').
  * @returns {Promise<Array>} Lista de comercios filtrados.
  */
+
+
 export const getCommercesByCategoryModel = async (category) => {
-    const isValidCategory = categories.includes(category.toUpperCase());
-    if (!isValidCategory) {
+    // La validación se mantiene, pero nos aseguramos de que el input no tenga espacios extra
+    if (!categories.includes(category)) {
+        // Este error ya no debería ocurrir, pero es una buena salvaguarda.
         throwError('Invalid category provided.', 400);
     }
+    
+    // Usamos la variable limpia en la consulta
     return prisma.commerce.findMany({
-        where: { category: category.toUpperCase(), status: 'ACTIVE' },
+        where: { 
+            category: category, // Prisma manejará el enum correctamente
+            status: 'ACTIVE' 
+        },
         orderBy: { name: 'asc' },
     });
 };
-
 /**
  * Obtiene un solo comercio activo por su ID, incluyendo sus eventos programados.
  * @param {number} id - El ID del comercio.

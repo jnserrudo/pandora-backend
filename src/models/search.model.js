@@ -1,29 +1,36 @@
 import prisma from '../db/prismaClient.js';
 
 export const searchGlobalModel = async (query) => {
-    // La búsqueda se hace en paralelo para mayor eficiencia
+    // MySQL Full-Text Search a menudo funciona mejor si se añade un '*'
+    // al final de cada palabra para buscar prefijos (ej. 'roc' encontrará 'rock').
+    const searchQuery = query.split(' ').map(word => `${word}*`).join(' ');
+
     const [commerces, events] = await Promise.all([
         // Búsqueda en Comercios
         prisma.commerce.findMany({
             where: {
-                status: 'ACTIVE', // Solo buscar en comercios activos
-                OR: [
-                    { name: { contains: query, mode: 'insensitive' } }, // insensitive para no distinguir mayús/minús
-                    { description: { contains: query, mode: 'insensitive' } },
-                ],
+                status: 'ACTIVE',
+                // --- USAMOS EL NUEVO OPERADOR 'search' ---
+                name: {
+                    search: searchQuery,
+                },
+                description: {
+                    search: searchQuery,
+                },
             },
         }),
         // Búsqueda en Eventos
         prisma.event.findMany({
             where: {
-                status: 'SCHEDULED', // Solo buscar en eventos programados
-                OR: [
-                    { name: { contains: query, mode: 'insensitive' } },
-                    { description: { contains: query, mode: 'insensitive' } },
-                ],
+                status: 'SCHEDULED',
+                // --- USAMOS EL NUEVO OPERADOR 'search' ---
+                name: {
+                    search: searchQuery,
+                },
+                description: {
+                    search: searchQuery,
+                },
             },
-            // --- ¡LA MEJORA CLAVE ESTÁ AQUÍ! ---
-            // Incluimos los datos completos del comercio al que pertenece cada evento.
             include: {
                 commerce: true,
             },
