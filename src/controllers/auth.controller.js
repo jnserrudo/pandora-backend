@@ -7,6 +7,7 @@ export const registerUser = async (req, res) => {
             return res.status(400).json({ message: 'Email, username, name, and password are required.' });
         }
         const newUser = await authModel.registerUserService(req.body);
+        console.log(newUser);
         res.status(201).json({ message: 'User registered successfully!', user: newUser });
     } catch (error) {
         console.log(error);
@@ -21,6 +22,7 @@ export const loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Identifier (email or username) and password are required.' });
         }
         const tokens = await authModel.loginUserService(identifier, password);
+        console.log('logeado');
         res.status(200).json({ message: 'Login successful!', ...tokens });
     } catch (error) {
         console.log(error);
@@ -32,6 +34,7 @@ export const refreshAccessToken = async (req, res) => {
     try {
         const { refreshToken } = req.body;
         const result = await authModel.refreshAccessTokenService(refreshToken);
+        console.log('refresh');
         res.status(200).json(result);
     } catch (error) {
         console.log(error);
@@ -42,6 +45,7 @@ export const refreshAccessToken = async (req, res) => {
 export const logoutUser = async (req, res) => {
     try {
         await authModel.logoutUserService(req.user.id);
+        console.log('logout');
         res.status(200).json({ message: 'Logged out successfully.' });
     } catch (error) {
         console.log(error);
