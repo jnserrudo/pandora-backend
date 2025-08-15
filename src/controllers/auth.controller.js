@@ -9,6 +9,7 @@ export const registerUser = async (req, res) => {
         const newUser = await authModel.registerUserService(req.body);
         res.status(201).json({ message: 'User registered successfully!', user: newUser });
     } catch (error) {
+        console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
     }
 };
@@ -22,6 +23,7 @@ export const loginUser = async (req, res) => {
         const tokens = await authModel.loginUserService(identifier, password);
         res.status(200).json({ message: 'Login successful!', ...tokens });
     } catch (error) {
+        console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
     }
 };
@@ -32,6 +34,7 @@ export const refreshAccessToken = async (req, res) => {
         const result = await authModel.refreshAccessTokenService(refreshToken);
         res.status(200).json(result);
     } catch (error) {
+        console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
     }
 };
@@ -41,6 +44,7 @@ export const logoutUser = async (req, res) => {
         await authModel.logoutUserService(req.user.id);
         res.status(200).json({ message: 'Logged out successfully.' });
     } catch (error) {
+        console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
     }
 };

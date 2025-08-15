@@ -21,8 +21,10 @@ export const getUserProfileModel = async (userId) => {
     });
 
     if (!user) {
+        console.log('User not found.');
         throwError('User not found.', 404);
     }
+    console.log('User found: ', user);
     return user;
 };
 
@@ -63,7 +65,9 @@ export const updateUserProfileModel = async (userId, data) => {
             },
         });
     } catch (error) {
+        console.log(error);
         if (error.code === 'P2025') {
+            console.log('User not found.');
             throwError('User not found.', 404);
         }
         throw error;

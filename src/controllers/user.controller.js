@@ -9,6 +9,7 @@ export const getMyProfile = async (req, res) => {
         const userProfile = await userModel.getUserProfileModel(req.user.id);
         res.status(200).json(userProfile);
     } catch (error) {
+        console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message });
     }
 };
@@ -21,6 +22,7 @@ export const updateMyProfile = async (req, res) => {
         const updatedUser = await userModel.updateUserProfileModel(req.user.id, req.body);
         res.status(200).json(updatedUser);
     } catch (error) {
+        console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message });
     }
 };
