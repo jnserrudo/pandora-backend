@@ -21,7 +21,7 @@ model User {
   refreshToken String? @db.Text
 
   // Relación con el comercio que posee
-  commerce  Commerce?
+  commerce  Commerce[]
   // -- RELACIÓN OPUESTA AÑADIDA --
   // Un usuario puede escribir muchos artículos
   articles  Article[]
@@ -46,7 +46,7 @@ model Commerce {
   category    CommerceCategory
 
   // -- Campos para Perfil Completo (MVP) --
-  galleryImages Json // Antes: String[]. Json es más flexible y estándar
+  galleryImages Json? // Antes: String[]. Json es más flexible y estándar
   website       String?
   instagram     String?
   facebook      String?
@@ -60,7 +60,7 @@ model Commerce {
 
   // -- Relaciones --
   owner   User @relation(fields: [ownerId], references: [id])
-  ownerId Int  @unique
+  ownerId Int  
 
   events Event[]
 
@@ -80,11 +80,17 @@ model Event {
   startDate   DateTime
   endDate     DateTime
   coverImage  String?
+  galleryImages Json? // Antes: String[]. Json es más flexible y estándar
+  address     String? // ¡AGREGADO! Campo opcional para la dirección del evento
 
   // -- Campos para Funcionalidades Futuras --
   ticketUrl String? // Link para comprar entradas
   price     Decimal?    @db.Decimal(10, 2) // Precio del evento
   status    EventStatus @default(SCHEDULED) // Para manejar el estado del evento
+  
+
+  latitude    Float? // Para mapas
+  longitude   Float? // Para mapas
 
   // -- Relaciones --
   commerce   Commerce @relation(fields: [commerceId], references: [id])

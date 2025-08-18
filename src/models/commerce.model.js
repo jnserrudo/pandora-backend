@@ -68,24 +68,39 @@ export const getCommerceByIdModel = async (id) => {
  * @param {number} ownerId - ID del usuario que será el dueño.
  * @returns {Promise<Object>} El nuevo comercio creado.
  */
+
 export const createCommerceModel = async (data, ownerId) => {
-    const existingCommerce = await prisma.commerce.findFirst({
-        where: { OR: [{ ownerId }, { name: data.name }] }
+    // 1. MODIFICACIÓN: Ahora solo comprobamos si el nombre del comercio ya existe.
+    // Quitamos la comprobación de `ownerId` para permitir que un usuario tenga varios comercios.
+    const existingCommerceByName = await prisma.commerce.findUnique({
+        where: { name: data.name }
     });
-    if (existingCommerce) {
-        const msg = existingCommerce.ownerId === ownerId ? 'User already owns a commerce.' : 'Commerce name is already taken.';
-        throwError(msg, 409);
+    
+    if (existingCommerceByName) {
+        throwError('Commerce name is already taken.', 409);
     }
     
+    // 2. AÑADIDO: Preparamos los datos para la creación,
+    // asegurando que 'galleryImages' tenga un valor por defecto.
+    const commerceData = {
+        ...data,
+        galleryImages: data.galleryImages ?? [], // Si no viene, usamos un array vacío
+        owner: { connect: { id: ownerId } }
+    };
+
+    // 3. MANTENIDO: La transacción es una excelente idea, la mantenemos.
+    // Se asegura de que ambas operaciones (crear comercio y actualizar rol) se completen
+    // o ninguna lo haga, manteniendo la consistencia de los datos.
     const [commerce, _] = await prisma.$transaction([
         prisma.commerce.create({
-            data: { ...data, owner: { connect: { id: ownerId } } }
+            data: commerceData // Usamos los datos preparados
         }),
         prisma.user.update({
             where: { id: ownerId },
             data: { role: 'OWNER' }
         })
     ]);
+
     return commerce;
 };
 
@@ -95,7 +110,7 @@ export const createCommerceModel = async (data, ownerId) => {
  * @returns {Promise<Object>} El comercio del usuario.
  */
 export const getCommerceByOwnerModel = async (ownerId) => {
-    const commerce = await prisma.commerce.findUnique({
+    const commerce = await prisma.commerce.findMany({
         where: { ownerId },
         include: { events: true },
     });
