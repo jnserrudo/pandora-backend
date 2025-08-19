@@ -9,22 +9,21 @@ import { throwError } from '../utils/error.utils.js';
  */
 export const getUserProfileModel = async (userId) => {
     const user = await prisma.user.findUnique({
-        where: { id: parseInt(userId) },
-        select: {
-            id: true,
-            username: true,
-            email: true,
-            name: true,
-            role: true,
-            createdAt: true,
-        },
+        where: { id: userId },
+        // Eliminamos el 'select' y dejamos solo el 'include'
+        include: {
+            commerces: true 
+        }
     });
-
-    if (!user) {
-        console.log('User not found.');
-        throwError('User not found.', 404);
+    
+    // Prisma es inteligente y no devolverá el campo 'password' por defecto
+    // si no lo pides explícitamente, por lo que no necesitas el 'select' para ocultarlo.
+    // Si quisieras ser extra seguro, puedes eliminarlo manualmente antes de devolverlo.
+    if (user) {
+        delete user.password;
+        delete user.refreshToken;
     }
-    console.log('User found: ', user);
+
     return user;
 };
 

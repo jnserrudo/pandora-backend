@@ -117,3 +117,17 @@ export const deleteArticleModel = async (id) => {
         throw error;
     }
 };
+
+
+export const getAllCategoriesModel = async () => {
+    return prisma.articleCategory.findMany({
+        orderBy: { name: 'asc' },
+    });
+};
+
+export const getAllArticlesForAdminModel = async () => {
+    return prisma.article.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { category: { select: { name: true } } },
+    });
+};

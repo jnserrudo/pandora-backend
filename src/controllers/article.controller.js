@@ -51,3 +51,23 @@ export const deleteArticle = async (req, res) => {
         res.status(error.statusCode || 500).json({ message: error.message });
     }
 };
+
+
+
+export const getArticleCategories = async (req, res) => {
+    try {
+        const categories = await articleModel.getAllCategoriesModel();
+        res.status(200).json(categories);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const getAllArticlesForAdmin = async (req, res) => {
+    try {
+        const articles = await articleModel.getAllArticlesForAdminModel();
+        res.status(200).json(articles);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

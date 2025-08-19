@@ -21,7 +21,7 @@ model User {
   refreshToken String? @db.Text
 
   // Relación con el comercio que posee
-  commerce  Commerce[]
+  commerces  Commerce[]
   // -- RELACIÓN OPUESTA AÑADIDA --
   // Un usuario puede escribir muchos artículos
   articles  Article[]
