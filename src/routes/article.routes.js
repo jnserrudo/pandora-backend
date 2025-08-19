@@ -7,6 +7,9 @@ import {
   deleteArticle,
   getAllArticlesForAdmin,
   getArticleCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 } from "../controllers/article.controller.js";
 import { authenticateToken } from "../middlewares/auth.middleware.js";
 import { authorizeRole } from "../middlewares/authorize.middleware.js";
@@ -56,6 +59,26 @@ router.delete(
   authenticateToken,
   authorizeRole(["ADMIN"]),
   deleteArticle
+);
+
+// --- RUTAS DE ADMIN PARA GESTIONAR CATEGORÍAS ---
+router.post(
+  "/articles/categories",
+  authenticateToken,
+  authorizeRole(["ADMIN"]),
+  createCategory
+);
+router.put(
+  "/articles/categories/:id",
+  authenticateToken,
+  authorizeRole(["ADMIN"]),
+  updateCategory
+);
+router.delete(
+  "/articles/categories/:id",
+  authenticateToken,
+  authorizeRole(["ADMIN"]),
+  deleteCategory
 );
 
 export default router;

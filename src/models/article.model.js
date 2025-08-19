@@ -131,3 +131,60 @@ export const getAllArticlesForAdminModel = async () => {
         include: { category: { select: { name: true } } },
     });
 };
+
+
+
+/**
+ * Crea una nueva categoría de artículo.
+ * @param {object} data - Datos, ej. { name: 'Nueva Categoría' }
+ */
+export const createCategoryModel = async (data) => {
+    const { name } = data;
+    if (!name) throwError('Category name is required.', 400);
+
+    const slug = slugify(name, { lower: true, strict: true });
+    const existingCategory = await prisma.articleCategory.findFirst({
+        where: { OR: [{ name }, { slug }] }
+    });
+    if (existingCategory) throwError('A category with this name or slug already exists.', 409);
+
+    return prisma.articleCategory.create({ data: { name, slug } });
+};
+
+/**
+ * Actualiza una categoría de artículo por su ID.
+ * @param {number} id - ID de la categoría.
+ * @param {object} data - Datos a actualizar.
+ */
+export const updateCategoryModel = async (id, data) => {
+    if (data.name) {
+        data.slug = slugify(data.name, { lower: true, strict: true });
+    }
+    try {
+        return await prisma.articleCategory.update({
+            where: { id: parseInt(id) },
+            data,
+        });
+    } catch (error) {
+        if (error.code === 'P2025') throwError('Category not found.', 404);
+        throw error;
+    }
+};
+
+/**
+ * Elimina una categoría de artículo por su ID.
+ * @param {number} id - ID de la categoría.
+ */
+export const deleteCategoryModel = async (id) => {
+    // Verificación: No permitir borrar si la categoría tiene artículos
+    const categoryWithArticles = await prisma.articleCategory.findUnique({
+        where: { id: parseInt(id) },
+        include: { articles: true },
+    });
+    if (!categoryWithArticles) throwError('Category not found.', 404);
+    if (categoryWithArticles.articles.length > 0) {
+        throwError('Cannot delete category because it is associated with articles.', 400);
+    }
+
+    await prisma.articleCategory.delete({ where: { id: parseInt(id) } });
+};
