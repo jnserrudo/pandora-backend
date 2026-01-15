@@ -9,19 +9,31 @@ import slugify from 'slugify';
  * Incluye la categoría a la que pertenecen.
  * @returns {Promise<Array>} Lista de artículos publicados.
  */
-export const getAllPublishedArticlesModel = async () => {
-    return prisma.article.findMany({
-        where: { status: 'PUBLISHED' },
-        orderBy: { createdAt: 'desc' },
-        include: {
-            category: {
-                select: {
-                    name: true,
-                    slug: true,
+export const getAllPublishedArticlesModel = async (options = {}) => {
+    const { page = 1, limit = 10, sortBy = 'recent' } = options;
+    const skip = (page - 1) * limit;
+    // Por ahora 'popular' no tiene métrica definida, usamos createdAt desc por defecto
+    const orderBy = { createdAt: 'desc' };
+
+    const [articles, total] = await Promise.all([
+        prisma.article.findMany({
+            where: { status: 'PUBLISHED' },
+            orderBy,
+            skip,
+            take: limit,
+            include: {
+                category: {
+                    select: {
+                        name: true,
+                        slug: true,
+                    },
                 },
             },
-        },
-    });
+        }),
+        prisma.article.count({ where: { status: 'PUBLISHED' } })
+    ]);
+
+    return { articles, total };
 };
 
 /**

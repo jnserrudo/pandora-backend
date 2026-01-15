@@ -4,8 +4,21 @@ import * as articleModel from '../models/article.model.js';
 
 export const getArticles = async (req, res) => {
     try {
-        const articles = await articleModel.getAllPublishedArticlesModel();
-        res.status(200).json(articles);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const sortBy = req.query.sortBy || 'recent';
+
+        const { articles, total } = await articleModel.getAllPublishedArticlesModel({ page, limit, sortBy });
+        
+        res.status(200).json({
+            articles,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         res.status(error.statusCode || 500).json({ message: error.message });
     }

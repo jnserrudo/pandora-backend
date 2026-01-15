@@ -50,6 +50,10 @@ export const searchGlobalModel = async (query) => {
     const eventResults = events.map(e => ({ ...e, type: 'event' }));
     const articleResults = articles.map(a => ({ ...a, type: 'article' })); // <-- Mapeamos los resultados de artículos
 
-    // Combinamos y devolvemos los resultados de las TRES búsquedas
-    return [...commerceResults, ...eventResults, ...articleResults];
+    // Combinamos y devolvemos los resultados en el formato solicitado
+    return {
+        commerces: commerceResults,
+        events: eventResults,
+        articles: articleResults
+    };
 };

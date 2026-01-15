@@ -10,6 +10,8 @@ import commerceRoutes from './routes/commerce.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
+import advertisementRoutes from './routes/advertisement.routes.js';
+import contactRoutes from './routes/contact.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +29,8 @@ app.use('/api', commerceRoutes);
 app.use('/api', eventRoutes);
 app.use('/api', searchRoutes);
 app.use('/api', uploadRoutes);
+app.use('/api', advertisementRoutes);
+app.use('/api', contactRoutes);
 
 const HOST = '0.0.0.0';
 

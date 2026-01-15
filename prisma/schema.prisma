@@ -63,6 +63,7 @@ model Commerce {
   ownerId Int  
 
   events Event[]
+  advertisements Advertisement[]
 
   // -- Relación con Suscripción (Futuro) --
   subscription Subscription?
@@ -183,4 +184,65 @@ enum SubscriptionStatus {
   CANCELLED
   EXPIRED
   PAST_DUE // Pago vencido
+}
+
+// --- MODELOS DE PUBLICIDAD Y CONTACTO (NUEVOS) ---
+
+model Advertisement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @db.Text
+  imageUrl    String   
+  link        String   
+  
+  category    AdvertisementCategory 
+  position    String   // banner_home, sidebar, banner_events, card
+  
+  isActive    Boolean  @default(true)
+  startDate   DateTime
+  endDate     DateTime
+  
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  
+  commerce   Commerce? @relation(fields: [commerceId], references: [id])
+  commerceId Int?
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ContactRequest {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String
+  phone        String?
+  interestType ContactInterestType
+  message      String   @db.Text
+  status       ContactStatus @default(PENDING)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum AdvertisementCategory {
+  COMMERCE  
+  EXTERNAL  
+  SPONSOR   
+}
+
+enum ContactInterestType {
+  GENERAL      
+  COMMERCE     
+  ADVERTISING  
+  SPONSOR      
+  PARTNERSHIP  
+  OTHER        
+}
+
+enum ContactStatus {
+  PENDING      
+  IN_PROGRESS  
+  RESOLVED     
+  ARCHIVED     
 }
