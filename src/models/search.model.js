@@ -13,6 +13,7 @@ export const searchGlobalModel = async (query) => {
         prisma.commerce.findMany({
             where: {
                 status: 'ACTIVE',
+                isActive: true,
                 OR: [
                     { name: { search: searchQuery } },
                     { description: { search: searchQuery } },
@@ -23,6 +24,7 @@ export const searchGlobalModel = async (query) => {
         prisma.event.findMany({
             where: {
                 status: 'SCHEDULED',
+                isActive: true,
                 OR: [
                     { name: { search: searchQuery } },
                     { description: { search: searchQuery } },
@@ -34,6 +36,7 @@ export const searchGlobalModel = async (query) => {
         prisma.article.findMany({
             where: {
                 status: 'PUBLISHED', // Solo buscar en artículos publicados
+                isActive: true,
                 OR: [
                     { title: { search: searchQuery } },
                     { subtitle: { search: searchQuery } },

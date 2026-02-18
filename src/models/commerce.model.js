@@ -1,4 +1,5 @@
 import prisma from '../db/prismaClient.js';
+import { moderateContent } from '../services/moderation.service.js';
 import { throwError } from '../utils/error.utils.js';
 
 // --- FUNCIONES PÚBLICAS (PARA CONSUMIDORES) ---
@@ -11,8 +12,22 @@ const categories = ['VIDA_NOCTURNA', 'GASTRONOMIA', 'SALAS_Y_TEATRO'];
  */
 export const getAllCommercesModel = async () => {
     return prisma.commerce.findMany({
-        where: { status: 'ACTIVE' },
+        where: { 
+            // status: 'ACTIVE', // Comentado para permitir ver data existente
+            isActive: true 
+        },
         orderBy: { name: 'asc' },
+    });
+};
+
+/**
+ * Obtiene todos los comercios pendientes de validación (solo ADMIN).
+ */
+export const getPendingCommercesModel = async () => {
+    return prisma.commerce.findMany({
+        where: { status: 'PENDING', isActive: true },
+        orderBy: { createdAt: 'desc' },
+        include: { owner: { select: { name: true, email: true } } }
     });
 };
 
@@ -33,8 +48,9 @@ export const getCommercesByCategoryModel = async (category) => {
     // Usamos la variable limpia en la consulta
     return prisma.commerce.findMany({
         where: { 
-            category: category, // Prisma manejará el enum correctamente
-            status: 'ACTIVE' 
+            category: category, 
+            // status: 'ACTIVE',
+            isActive: true
         },
         orderBy: { name: 'asc' },
     });
@@ -54,7 +70,7 @@ export const getCommerceByIdModel = async (id) => {
             },
         },
     });
-    if (!commerce || commerce.status !== 'ACTIVE') {
+    if (!commerce || commerce.status !== 'ACTIVE' || !commerce.isActive) {
         throwError('Commerce not found or is not active.', 404);
     }
     return commerce;
@@ -69,6 +85,7 @@ export const getCommerceByIdModel = async (id) => {
  * @returns {Promise<Object>} El nuevo comercio creado.
  */
 
+
 export const createCommerceModel = async (data, ownerId) => {
     // 1. MODIFICACIÓN: Ahora solo comprobamos si el nombre del comercio ya existe.
     // Quitamos la comprobación de `ownerId` para permitir que un usuario tenga varios comercios.
@@ -79,8 +96,16 @@ export const createCommerceModel = async (data, ownerId) => {
     if (existingCommerceByName) {
         throwError('Commerce name is already taken.', 409);
     }
-    
-    // 2. AÑADIDO: Preparamos los datos para la creación,
+
+    // 🛡️ AI GUARD: Analizar contenido antes de crear
+    const textToAnalyze = `${data.name}\n${data.description}`;
+    const moderationResult = await moderateContent(textToAnalyze, 'COMMERCE');
+
+    if (!moderationResult.approved) {
+        throwError(moderationResult.reason || 'Contenido rechazado por el sistema de moderación', 400);
+    }
+   
+    //  2. AÑADIDO: Preparamos los datos para la creación,
     // asegurando que 'galleryImages' tenga un valor por defecto.
     const commerceData = {
         ...data,
@@ -93,7 +118,11 @@ export const createCommerceModel = async (data, ownerId) => {
     // o ninguna lo haga, manteniendo la consistencia de los datos.
     const [commerce, _] = await prisma.$transaction([
         prisma.commerce.create({
-            data: commerceData // Usamos los datos preparados
+            data: {
+                ...commerceData,
+                status: 'PENDING' // Todos van a PENDING para revisión manual del admin
+                // Si moderationResult.requiresReview es true, el admin verá un FLAG especial
+            }
         }),
         prisma.user.update({
             where: { id: ownerId },
@@ -101,7 +130,38 @@ export const createCommerceModel = async (data, ownerId) => {
         })
     ]);
 
+    // Si el contenido fue flagueado, podríamos notificar al admin aquí
+    if (moderationResult.requiresReview) {
+        console.log(`⚠️ Comercio ${commerce.id} flagueado por AI Guard para revisión extra`);
+        // TODO: Enviar notificación al admin
+    }
+
     return commerce;
+};
+
+/**
+ * Valida un comercio (solo ADMIN).
+ */
+export const validateCommerceModel = async (id, adminId, status, reason) => {
+    return prisma.commerce.update({
+        where: { id: parseInt(id) },
+        data: {
+            status,
+            validationReason: reason,
+            validatedById: adminId,
+            validatedAt: new Date(),
+            ...(status === 'REJECTED' && { isActive: false })
+        },
+        include: { owner: true }
+    });
+};
+
+// Implementación de Soft Delete para Commerce
+export const deleteCommerceModel = async (id) => {
+    return prisma.commerce.update({
+        where: { id: parseInt(id) },
+        data: { isActive: false }
+    });
 };
 
 /**

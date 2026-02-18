@@ -10,6 +10,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  updateArticleStatus,
 } from "../controllers/article.controller.js";
 import { authenticateToken } from "../middlewares/auth.middleware.js";
 import { authorizeRole } from "../middlewares/authorize.middleware.js";
@@ -59,6 +60,14 @@ router.delete(
   authenticateToken,
   authorizeRole(["ADMIN"]),
   deleteArticle
+);
+
+// --- NUEVA RUTA: Actualizar status (isActive) ---
+router.put(
+  "/articles/:id/status",
+  authenticateToken,
+  authorizeRole(["ADMIN"]),
+  updateArticleStatus
 );
 
 // --- RUTAS DE ADMIN PARA GESTIONAR CATEGORÍAS ---

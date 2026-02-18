@@ -25,6 +25,17 @@ model User {
   // -- RELACIÓN OPUESTA AÑADIDA --
   // Un usuario puede escribir muchos artículos
   articles  Article[]
+  
+  isActive  Boolean  @default(true)
+  validatedCommerces Commerce[] @relation("CommerceValidator")
+  notifications Notification[]
+  submissions   Submission[]
+  
+  // Nuevas relaciones para feedback
+  comments      CommerceComment[] @relation("UserComments")
+  advisories    CommerceAdvisory[] @relation("AdvisorAdvisories")
+  moderationLogs ModerationLog[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -56,7 +67,21 @@ model Commerce {
   longitude    Float? // Para mapas
   openingHours Json? // Para horarios complejos (ej. L-V: 9-18, S: 10-14)
   isVerified   Boolean        @default(false) // Para la insignia "Socio Pandora"
-  status       CommerceStatus @default(ACTIVE) // Para activar/desactivar locales
+  status       CommerceStatus @default(PENDING) // Para activar/desactivar locales
+  isActive     Boolean        @default(true)   // Borrado lógico
+  planLevel    Int            @default(1)
+
+  // -- Campos de Feedback y Visibilidad --
+  isFeatured      Boolean  @default(false) // Destacado en home (beneficio plan alto)
+  featuredUntil   DateTime? // Hasta cuándo está destacado
+  totalComments   Int      @default(0) // Calculado automáticamente
+  averageRating   Float? // Promedio de ratings de comentarios
+
+  // Auditoría
+  validatedBy      User?     @relation("CommerceValidator", fields: [validatedById], references: [id])
+  validatedById    Int?
+  validationReason String?   @db.Text
+  validatedAt      DateTime?
 
   // -- Relaciones --
   owner   User @relation(fields: [ownerId], references: [id])
@@ -64,9 +89,13 @@ model Commerce {
 
   events Event[]
   advertisements Advertisement[]
+  comments       CommerceComment[] // Nueva relación
+  advisories     CommerceAdvisory[] // Nueva relación
 
-  // -- Relación con Suscripción (Futuro) --
-  subscription Subscription?
+  // -- Suscripción y Planes --
+  plan            Plan?           @relation(fields: [planId], references: [id])
+  planId          Int?
+  history         PlanHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -88,6 +117,7 @@ model Event {
   ticketUrl String? // Link para comprar entradas
   price     Decimal?    @db.Decimal(10, 2) // Precio del evento
   status    EventStatus @default(SCHEDULED) // Para manejar el estado del evento
+  isActive  Boolean     @default(true)      // Borrado lógico
   
 
   latitude    Float? // Para mapas
@@ -111,6 +141,7 @@ model Article {
   content    String        @db.Text
   coverImage String
   status     PublishStatus @default(DRAFT)
+  isActive   Boolean       @default(true) // Borrado lógico
 
   // -- Relaciones --
   category   ArticleCategory @relation(fields: [categoryId], references: [id])
@@ -138,21 +169,6 @@ model ArticleCategory {
 
 // --- MODELOS PARA MONETIZACIÓN FUTURA ---
 
-model Subscription {
-  id     String             @id @default(cuid())
-  planId String // ej. "plan_plus", "plan_premium"
-  status SubscriptionStatus
-
-  startDate DateTime
-  endDate   DateTime
-
-  commerce   Commerce @relation(fields: [commerceId], references: [id])
-  commerceId Int      @unique
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 // --- ENUMS ---
 
 enum CommerceCategory {
@@ -177,13 +193,6 @@ enum EventStatus {
 enum PublishStatus {
   DRAFT
   PUBLISHED
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  CANCELLED
-  EXPIRED
-  PAST_DUE // Pago vencido
 }
 
 // --- MODELOS DE PUBLICIDAD Y CONTACTO (NUEVOS) ---
@@ -212,18 +221,8 @@ model Advertisement {
   updatedAt  DateTime @updatedAt
 }
 
-model ContactRequest {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String
-  phone        String?
-  interestType ContactInterestType
-  message      String   @db.Text
-  status       ContactStatus @default(PENDING)
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
+// La funcionalidad de ContactRequest ahora está unificada en el modelo Submission
+// [DELETE] model ContactRequest { ... }
 
 enum AdvertisementCategory {
   COMMERCE  
@@ -231,18 +230,156 @@ enum AdvertisementCategory {
   SPONSOR   
 }
 
-enum ContactInterestType {
-  GENERAL      
-  COMMERCE     
-  ADVERTISING  
-  SPONSOR      
-  PARTNERSHIP  
-  OTHER        
+// ContactStatus y ContactInterestType unificados en Submission status/type
+// [DELETE] enum ContactInterestType { ... }
+// [DELETE] enum ContactStatus { ... }
+
+model Notification {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id])
+  type         String   // 'NEW_COMMERCE_REQUEST', 'COMMERCE_VALIDATED', etc.
+  message      String   @db.Text
+  referenceId  Int?
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
 }
 
-enum ContactStatus {
-  PENDING      
-  IN_PROGRESS  
-  RESOLVED     
-  ARCHIVED     
+model Submission {
+  id              Int       @id @default(autoincrement())
+  userId          Int?      // Opcional para usuarios no logueados (contactos)
+  user            User?     @relation(fields: [userId], references: [id])
+  type            String    // 'CONTACT', 'AD_PROPOSAL', 'MAGAZINE_PROPOSAL', 'PLAN_UPGRADE'
+  name            String?   // Para no logueados
+  email           String?   // Para no logueados
+  phone           String?
+  message         String    @db.Text
+  attachmentUrl   String?   // Comprobante de pago, imagen de ad, PDF de revista
+  adminResponse   String?   @db.Text
+  status          String    @default("PENDING") // 'PENDING', 'RESPONDED', 'ARCHIVED', 'APPROVED', 'REJECTED'
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Plan {
+  id              Int             @id @default(autoincrement())
+  level           Int             @unique
+  name            String
+  price           Float
+  description     String?         @db.Text
+  benefits        String?         @db.Text
+  commerces       Commerce[]
+  history         PlanHistory[]
+}
+
+model Coupon {
+  id              Int             @id @default(autoincrement())
+  code            String          @unique
+  discountPercent Int             @default(0) // 0-100
+  isActive        Boolean         @default(true)
+  expiresAt       DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @default(now()) @updatedAt
+}
+
+model PlanHistory {
+  id              Int             @id @default(autoincrement())
+  commerceId      Int
+  commerce        Commerce        @relation(fields: [commerceId], references: [id])
+  oldLevel        Int
+  newLevel        Int
+  planId          Int
+  plan            Plan            @relation(fields: [planId], references: [id])
+  couponUsed      String?         // Código del cupón usado
+  discountApplied Float?          // Monto del descuento
+  totalPaid       Float           // Monto final pagado
+  method          String          // 'NORMAL', 'OFFER', 'COUPON', 'ADMIN_ADJUSTMENT'
+  paymentProof    String?         // URL del comprobante
+  createdAt       DateTime        @default(now())
+}
+
+// --- SISTEMA DE FEEDBACK PARA COMERCIOS ---
+
+model CommerceComment {
+  id          Int      @id @default(autoincrement())
+  commerceId  Int
+  commerce    Commerce @relation(fields: [commerceId], references: [id])
+  
+  // Quién comentó (puede ser usuario anónimo o logueado)
+  userId      Int?
+  user        User?    @relation("UserComments", fields: [userId], references: [id])
+  userName    String?  // Para usuarios no logueados
+  
+  // Contenido
+  comment     String   @db.Text
+  rating      Int?     // Opcional: 1-5 estrellas
+  category    String?  // 'SERVICIO', 'AMBIENTE', 'CALIDAD', 'PRECIO', 'OTRO'
+  
+  // Metadata para admins
+  isRead      Boolean  @default(false)
+  adminNotes  String?  @db.Text  // Notas internas del admin
+  priority    String   @default("NORMAL") // 'LOW', 'NORMAL', 'HIGH', 'URGENT'
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CommerceAdvisory {
+  id              Int      @id @default(autoincrement())
+  commerceId      Int
+  commerce        Commerce @relation(fields: [commerceId], references: [id])
+
+  
+  advisorId       Int
+  advisor         User     @relation("AdvisorAdvisories", fields: [advisorId], references: [id])
+  
+  // Contenido de la asesoría
+  title           String
+  content         String   @db.Text
+  recommendations String   @db.Text
+  
+  // Métricas en el momento de la asesoría
+  metricsSnapshot Json?    // { impressions, clicks, ctr, comments, avgRating }
+  
+  // Seguimiento
+  status          String   @default("SENT") // 'SENT', 'READ', 'IMPLEMENTED'
+  implementedAt   DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// --- MODERACIÓN CON IA (AI GUARD) ---
+
+model ModerationLog {
+  id              Int      @id @default(autoincrement())
+  resourceType    String   // 'ARTICLE', 'COMMERCE', 'EVENT'
+  resourceId      Int?     // Null si fue rechazado antes de crearse
+  status          String   // 'APPROVED', 'FLAGGED', 'REJECTED'
+  
+  // Resultados de análisis
+  basicFilterResult Json?  // { blocked: bool, reason: string }
+  aiResult          Json?  // Respuesta completa de OpenAI Moderation
+  
+  // Metadata
+  analyzedText      String  @db.Text // El texto que se analizó
+  
+  // Revisión administrativa (solo para FLAGGED)
+  adminNotes        String? @db.Text
+  reviewedBy        Int?
+  reviewer          User?   @relation(fields: [reviewedBy], references: [id])
+  reviewedAt        DateTime?
+  
+  createdAt         DateTime @default(now())
+}
+// --- SISTEMA DE ANALÍTICAS DE BÚSQUEDA ---
+
+model SearchQuery {
+  id            Int      @id @default(autoincrement())
+  term          String   @unique
+  count         Int      @default(1)
+  lastSearched  DateTime @default(now())
+  
+  @@fulltext([term])
 }

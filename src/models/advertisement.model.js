@@ -5,7 +5,7 @@ export const getAllAdvertisementsModel = async (filters) => {
     const where = {
         ...(category && { category }),
         ...(position && { position }),
-        ...(isActive !== undefined && { isActive: isActive === 'true' }), // Convertir string 'true'/'false'
+        isActive: isActive !== undefined ? isActive === 'true' : true, // Filtrado por defecto
         startDate: { lte: new Date() },
         endDate: { gte: new Date() }
     };
@@ -22,7 +22,7 @@ export const getAllAdvertisementsModel = async (filters) => {
 };
 
 export const getAdvertisementByIdModel = async (id) => {
-    return await prisma.advertisement.findUnique({
+    const ad = await prisma.advertisement.findUnique({
         where: { id: parseInt(id) },
         include: {
             commerce: {
@@ -30,6 +30,10 @@ export const getAdvertisementByIdModel = async (id) => {
             }
         }
     });
+    if (!ad || !ad.isActive) {
+        throw Error('Advertisement not found or inactive');
+    }
+    return ad;
 };
 
 export const createAdvertisementModel = async (data) => {
@@ -61,8 +65,9 @@ export const updateAdvertisementModel = async (id, data) => {
 };
 
 export const deleteAdvertisementModel = async (id) => {
-    return await prisma.advertisement.delete({
-        where: { id: parseInt(id) }
+    return await prisma.advertisement.update({
+        where: { id: parseInt(id) },
+        data: { isActive: false }
     });
 };
 

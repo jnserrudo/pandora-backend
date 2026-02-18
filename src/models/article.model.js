@@ -17,7 +17,10 @@ export const getAllPublishedArticlesModel = async (options = {}) => {
 
     const [articles, total] = await Promise.all([
         prisma.article.findMany({
-            where: { status: 'PUBLISHED' },
+            where: { 
+                status: 'PUBLISHED',
+                isActive: true
+            },
             orderBy,
             skip,
             take: limit,
@@ -30,7 +33,7 @@ export const getAllPublishedArticlesModel = async (options = {}) => {
                 },
             },
         }),
-        prisma.article.count({ where: { status: 'PUBLISHED' } })
+        prisma.article.count({ where: { status: 'PUBLISHED', isActive: true } })
     ]);
 
     return { articles, total };
@@ -48,8 +51,8 @@ export const getArticleBySlugModel = async (slug) => {
             category: true,
         },
     });
-    // Un usuario público solo puede ver artículos publicados.
-    if (!article || article.status !== 'PUBLISHED') {
+    // Un usuario público solo puede ver artículos publicados y que no estén eliminados lógicamente.
+    if (!article || article.status !== 'PUBLISHED' || !article.isActive) {
         throwError('Article not found or is not published.', 404);
     }
     return article;
@@ -119,8 +122,9 @@ export const updateArticleModel = async (id, data) => {
  */
 export const deleteArticleModel = async (id) => {
     try {
-        await prisma.article.delete({
+        await prisma.article.update({
             where: { id: parseInt(id) },
+            data: { isActive: false }
         });
     } catch (error) {
         if (error.code === 'P2025') {
@@ -128,6 +132,16 @@ export const deleteArticleModel = async (id) => {
         }
         throw error;
     }
+};
+
+/**
+ * Actualiza el estado isActive de un artículo (solo ADMIN).
+ */
+export const updateArticleStatusModel = async (id, isActive) => {
+    return prisma.article.update({
+        where: { id: parseInt(id) },
+        data: { isActive }
+    });
 };
 
 

@@ -10,15 +10,18 @@ import { throwError } from '../utils/error.utils.js';
 export const getUserProfileModel = async (userId) => {
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        // Eliminamos el 'select' y dejamos solo el 'include'
         include: {
-            commerces: true 
+            commerces: {
+                where: { isActive: true }
+            }
         }
     });
     
-    // Prisma es inteligente y no devolverá el campo 'password' por defecto
-    // si no lo pides explícitamente, por lo que no necesitas el 'select' para ocultarlo.
-    // Si quisieras ser extra seguro, puedes eliminarlo manualmente antes de devolverlo.
+    // Si el usuario no existe o está inactivo lógicamente
+    if (!user || !user.isActive) {
+        throwError('User not found or is inactive.', 404);
+    }
+
     if (user) {
         delete user.password;
         delete user.refreshToken;

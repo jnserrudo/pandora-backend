@@ -5,6 +5,7 @@ import {
     createEvent,
     updateEvent,
     deleteEvent,
+    updateEventStatus,
 } from '../controllers/event.controller.js';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 import { authorizeRole } from '../middlewares/authorize.middleware.js';
@@ -36,8 +37,10 @@ router.post('/events', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), cre
 // PUT /api/events/1
 router.put('/events/:id', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), updateEvent);
 
-// Eliminar un evento (requiere ser OWNER o ADMIN)
-// DELETE /api/events/1
+// Eliminar un evento (borrado lógico simplificado)
 router.delete('/events/:id', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), deleteEvent);
+
+// Actualizar status (isActive) - Solo ADMIN
+router.put('/events/:id/status', authenticateToken, authorizeRole(['ADMIN']), updateEventStatus);
 
 export default router;

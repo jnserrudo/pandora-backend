@@ -8,9 +8,22 @@ import { throwError } from '../utils/error.utils.js';
  * Incluye información básica del comercio al que pertenecen.
  * @returns {Promise<Array>} Lista de eventos.
  */
-export const getAllEventsModel = async () => {
+export const getAllEventsModel = async (filters = {}) => {
+    const { category, commerceId, startDate, endDate } = filters;
+    
     return prisma.event.findMany({
-        where: { status: 'SCHEDULED' },
+        where: { 
+            status: 'SCHEDULED',
+            isActive: true,
+            ...(category && { category }),
+            ...(commerceId && { commerceId: parseInt(commerceId) }),
+            ...(startDate && endDate && {
+                startDate: {
+                    gte: new Date(startDate),
+                    lte: new Date(endDate)
+                }
+            })
+        },
         orderBy: { startDate: 'asc' },
         include: {
             commerce: {
@@ -35,7 +48,7 @@ export const getEventByIdModel = async (id) => {
             commerce: true, // Incluimos todos los datos del comercio
         },
     });
-    if (!event || event.status !== 'SCHEDULED') {
+    if (!event || event.status !== 'SCHEDULED' || !event.isActive) {
         throwError('Event not found or is not active.', 404);
     }
     return event;
@@ -122,7 +135,18 @@ export const deleteEventModel = async (eventId, ownerId) => {
         throwError('Forbidden: You do not have permission to delete this event.', 403);
     }
 
-    await prisma.event.delete({
+    await prisma.event.update({
         where: { id: parseInt(eventId) },
+        data: { isActive: false }
+    });
+};
+
+/**
+ * Actualiza el estado isActive de un evento (solo ADMIN).
+ */
+export const updateEventStatusModel = async (id, isActive) => {
+    return prisma.event.update({
+        where: { id: parseInt(id) },
+        data: { isActive }
     });
 };

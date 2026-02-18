@@ -1,8 +1,11 @@
-import * as contactModel from '../models/contact.model.js';
+import * as submissionModel from '../models/submission.model.js';
 
 export const createContactRequest = async (req, res) => {
     try {
-        await contactModel.createContactRequestModel(req.body);
+        await submissionModel.createSubmissionModel({
+            ...req.body,
+            type: 'CONTACT'
+        });
         res.status(200).json({
             success: true,
             message: "Tu mensaje fue recibido. Nos contactaremos pronto."

@@ -107,3 +107,14 @@ export const deleteCategory = async (req, res, next) => {
         res.status(204).send();
     } catch (error) { next(error) }
 };
+
+export const updateArticleStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isActive } = req.body;
+        const updatedArticle = await articleModel.updateArticleStatusModel(id, isActive);
+        res.status(200).json(updatedArticle);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ message: error.message });
+    }
+};

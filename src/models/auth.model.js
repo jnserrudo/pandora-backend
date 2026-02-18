@@ -14,8 +14,10 @@ const throwError = (message, statusCode) => {
 
 export const registerUserService = async (userData) => {
   const { email, username, password, name } = userData;
+  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedUsername = username.toLowerCase().trim();
   const existingUser = await prisma.user.findFirst({
-    where: { OR: [{ email }, { username }] },
+    where: { OR: [{ email: normalizedEmail }, { username: normalizedUsername }] },
   });
 
   if (existingUser) {
@@ -28,7 +30,12 @@ export const registerUserService = async (userData) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const newUser = await prisma.user.create({
-    data: { email, username, name, password: hashedPassword },
+    data: { 
+      email: normalizedEmail, 
+      username: normalizedUsername, 
+      name, 
+      password: hashedPassword 
+    },
   });
 
   const { password: _, ...userWithoutPassword } = newUser;
@@ -36,8 +43,9 @@ export const registerUserService = async (userData) => {
 };
 
 export const loginUserService = async (identifier, password) => {
+  const normalizedIdentifier = identifier.toLowerCase().trim();
   const user = await prisma.user.findFirst({
-    where: { OR: [{ email: identifier }, { username: identifier }] },
+    where: { OR: [{ email: normalizedIdentifier }, { username: normalizedIdentifier }] },
   });
 
   if (!user) {

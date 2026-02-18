@@ -4,7 +4,7 @@ import * as eventModel from '../models/event.model.js';
 
 export const getEvents = async (req, res) => {
     try {
-        const events = await eventModel.getAllEventsModel();
+        const events = await eventModel.getAllEventsModel(req.query);
         res.status(200).json(events);
     } catch (error) {
         console.log(error);
@@ -51,6 +51,18 @@ export const deleteEvent = async (req, res) => {
         const { id } = req.params;
         await eventModel.deleteEventModel(id, req.user.id);
         res.status(204).send(); // 204 No Content es la respuesta estándar para un delete exitoso.
+    } catch (error) {
+        console.log(error);
+        res.status(error.statusCode || 500).json({ message: error.message });
+    }
+};
+
+export const updateEventStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isActive } = req.body;
+        const updatedEvent = await eventModel.updateEventStatusModel(id, isActive);
+        res.status(200).json(updatedEvent);
     } catch (error) {
         console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message });

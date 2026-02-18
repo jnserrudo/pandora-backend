@@ -7,6 +7,8 @@ import {
     createCommerce,
     getMyCommerce,
     updateMyCommerce,
+    validateCommerce,
+    getPendingCommerces,
 } from '../controllers/commerce.controller.js';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 import { authorizeRole } from '../middlewares/authorize.middleware.js';
@@ -30,6 +32,10 @@ router.get('/commerces', getCommerces);
 // GET /api/commerces/me
 router.get('/commerces/me', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), getMyCommerce);
 
+// Obtener comercios pendientes (SOLO ADMIN)
+// GET /api/commerces/pending
+router.get('/commerces/pending', authenticateToken, authorizeRole(['ADMIN']), getPendingCommerces);
+
 // Actualizar el comercio del usuario logueado.
 // PUT /api/commerces/me
 router.put('/commerces/me', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), updateMyCommerce);
@@ -37,6 +43,10 @@ router.put('/commerces/me', authenticateToken, authorizeRole(['OWNER', 'ADMIN'])
 // Crear un nuevo comercio.
 // POST /api/commerces
 router.post('/commerces', authenticateToken, authorizeRole(['USER', 'ADMIN']), createCommerce);
+
+// Validar comercio (SOLO ADMIN)
+// PUT /api/commerces/:id/validate
+router.put('/commerces/:id/validate', authenticateToken, authorizeRole(['ADMIN']), validateCommerce);
 
 
 // ===============================================

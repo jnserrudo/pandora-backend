@@ -10,3 +10,5 @@ node_modules
 # Personal notes
 apuntes.txt
 /src/generated/prisma
+
+*.sql
