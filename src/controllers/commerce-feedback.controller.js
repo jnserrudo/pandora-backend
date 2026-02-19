@@ -243,7 +243,7 @@ async function notifyAdminsNewComment(commerceId, comment) {
           userId: admin.id,
           type: 'NEW_COMMERCE_COMMENT',
           message: `Nuevo comentario en ${commerce.name}: "${comment.comment.substring(0, 50)}..."`,
-          referenceId: comment.id
+          referenceId: parseInt(commerceId)
         }
       });
     }
@@ -265,9 +265,9 @@ async function notifyCommerceOwnerAdvisory(commerceId, advisory) {
     await prisma.notification.create({
       data: {
         userId: commerce.ownerId,
-        type: 'NEW_ADVISORY',
+        type: 'NEW_COMMERCE_ADVISORY',
         message: `Nueva asesoría para ${commerce.name}: ${advisory.title}`,
-        referenceId: advisory.id
+        referenceId: parseInt(commerceId)
       }
     });
   } catch (error) {
