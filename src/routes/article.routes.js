@@ -6,6 +6,7 @@ import {
   updateArticle,
   deleteArticle,
   getAllArticlesForAdmin,
+  getArticleForAdmin,
   getArticleCategories,
   createCategory,
   updateCategory,
@@ -36,6 +37,14 @@ router.get(
   authenticateToken,
   authorizeRole(["ADMIN"]),
   getAllArticlesForAdmin
+);
+
+// Obtiene un artículo por ID para edición (sin restricción de estado)
+router.get(
+  "/articles/manage/:id",
+  authenticateToken,
+  authorizeRole(["ADMIN"]),
+  getArticleForAdmin
 );
 
 // Crear un nuevo artículo

@@ -57,6 +57,7 @@ model Commerce {
   category    CommerceCategory
 
   // -- Campos para Perfil Completo (MVP) --
+  coverImage    String?
   galleryImages Json? // Antes: String[]. Json es más flexible y estándar
   website       String?
   instagram     String?
@@ -112,6 +113,7 @@ model Event {
   coverImage  String?
   galleryImages Json? // Antes: String[]. Json es más flexible y estándar
   address     String? // ¡AGREGADO! Campo opcional para la dirección del evento
+  location    String? // ¡AGREGADO! Referencia específica (ej: Planta Alta)
 
   // -- Campos para Funcionalidades Futuras --
   ticketUrl String? // Link para comprar entradas

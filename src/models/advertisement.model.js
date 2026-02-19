@@ -1,14 +1,35 @@
 import prisma from '../db/prismaClient.js';
 
-export const getAllAdvertisementsModel = async (filters) => {
+// Para el ADMIN queremos ver TODAS las publicidades sin filtros de fecha
+// Para el PÚBLICO queremos filtrar por activas y vigencia
+export const getAllAdvertisementsModel = async (filters, adminMode = false) => {
     const { category, position, isActive } = filters;
-    const where = {
-        ...(category && { category }),
-        ...(position && { position }),
-        isActive: isActive !== undefined ? isActive === 'true' : true, // Filtrado por defecto
-        startDate: { lte: new Date() },
-        endDate: { gte: new Date() }
-    };
+
+    let where = {};
+
+    // Filtros de categoría y posición (aplican siempre)
+    if (category) where.category = category;
+    if (position) where.position = position;
+
+    if (adminMode) {
+        // ADMIN: ve ABSOLUTAMENTE TODAS las publicidades
+        // Sin filtro de isActive, sin filtro de fechas.
+        // Puede estar vencida, inactiva, futura — el admin siempre la ve.
+        if (isActive !== undefined) {
+            where.isActive = isActive === 'true' || isActive === true;
+        }
+        // Sin filtros de fecha en adminMode
+    } else {
+        // PÚBLICO: solo activas y vigentes ahora mismo
+        const now = new Date();
+        where.isActive = true;
+        where.startDate = { lte: now };
+        // Ads sin endDate son siempre vigentes
+        where.OR = [
+            { endDate: null },
+            { endDate: { gte: now } }
+        ];
+    }
 
     return await prisma.advertisement.findMany({
         where,
@@ -21,7 +42,7 @@ export const getAllAdvertisementsModel = async (filters) => {
     });
 };
 
-export const getAdvertisementByIdModel = async (id) => {
+export const getAdvertisementByIdModel = async (id, adminMode = false) => {
     const ad = await prisma.advertisement.findUnique({
         where: { id: parseInt(id) },
         include: {
@@ -30,22 +51,29 @@ export const getAdvertisementByIdModel = async (id) => {
             }
         }
     });
-    if (!ad || !ad.isActive) {
+
+    if (!ad) {
+        throw Error('Advertisement not found');
+    }
+
+    // Solo restringir acceso público a publicidades inactivas
+    if (!adminMode && !ad.isActive) {
         throw Error('Advertisement not found or inactive');
     }
+
     return ad;
 };
 
 export const createAdvertisementModel = async (data) => {
-    // Convertir fechas string a Date objects si es necesario (Prisma suele manejarlo, pero mejor asegurar)
     const { startDate, endDate, commerceId, ...rest } = data;
     
     return await prisma.advertisement.create({
         data: {
             ...rest,
             startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            ...(commerceId && { commerceId: parseInt(commerceId) })
+            // endDate es opcional: solo convertir si no es null/undefined/""
+            ...(endDate ? { endDate: new Date(endDate) } : {}),
+            ...(commerceId ? { commerceId: parseInt(commerceId) } : {})
         }
     });
 };
@@ -55,8 +83,15 @@ export const updateAdvertisementModel = async (id, data) => {
     const updateData = { ...rest };
     
     if (startDate) updateData.startDate = new Date(startDate);
-    if (endDate) updateData.endDate = new Date(endDate);
+    // Permitir borrar la fecha de fin enviando null explícitamente
+    if (endDate !== undefined) {
+        updateData.endDate = endDate ? new Date(endDate) : null;
+    }
     if (commerceId) updateData.commerceId = parseInt(commerceId);
+    // Limpiar relación si commerceId es null
+    if (commerceId === null || commerceId === '' || commerceId === 0) {
+        updateData.commerceId = null;
+    }
 
     return await prisma.advertisement.update({
         where: { id: parseInt(id) },

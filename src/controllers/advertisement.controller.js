@@ -2,7 +2,9 @@ import * as advertisementModel from '../models/advertisement.model.js';
 
 export const getAdvertisements = async (req, res) => {
     try {
-        const advertisements = await advertisementModel.getAllAdvertisementsModel(req.query);
+        // Si el usuario es ADMIN y pasa el query param admin=true, devolvemos todo
+        const adminMode = req.query.admin === 'true';
+        const advertisements = await advertisementModel.getAllAdvertisementsModel(req.query, adminMode);
         res.status(200).json(advertisements);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -11,7 +13,9 @@ export const getAdvertisements = async (req, res) => {
 
 export const getAdvertisementById = async (req, res) => {
     try {
-        const advertisement = await advertisementModel.getAdvertisementByIdModel(req.params.id);
+        // adminMode: si tiene token de admin, puede ver publicidades inactivas
+        const adminMode = req.query.admin === 'true';
+        const advertisement = await advertisementModel.getAdvertisementByIdModel(req.params.id, adminMode);
         if (!advertisement) {
             return res.status(404).json({ message: 'Advertisement not found' });
         }

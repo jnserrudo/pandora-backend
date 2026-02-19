@@ -86,6 +86,17 @@ export const getAllArticlesForAdmin = async (req, res) => {
     }
 };
 
+export const getArticleForAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const article = await articleModel.getArticleByIdForAdminModel(id);
+        if (!article) return res.status(404).json({ message: 'Article not found' });
+        res.status(200).json(article);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 
 export const createCategory = async (req, res, next) => {
     try {

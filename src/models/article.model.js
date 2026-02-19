@@ -158,6 +158,13 @@ export const getAllArticlesForAdminModel = async () => {
     });
 };
 
+export const getArticleByIdForAdminModel = async (id) => {
+    return prisma.article.findUnique({
+        where: { id: parseInt(id) },
+        include: { category: { select: { id: true, name: true, slug: true } } },
+    });
+};
+
 
 
 /**

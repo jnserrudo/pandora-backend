@@ -116,19 +116,12 @@ export const createCommerceModel = async (data, ownerId) => {
     // 3. MANTENIDO: La transacción es una excelente idea, la mantenemos.
     // Se asegura de que ambas operaciones (crear comercio y actualizar rol) se completen
     // o ninguna lo haga, manteniendo la consistencia de los datos.
-    const [commerce, _] = await prisma.$transaction([
-        prisma.commerce.create({
-            data: {
-                ...commerceData,
-                status: 'PENDING' // Todos van a PENDING para revisión manual del admin
-                // Si moderationResult.requiresReview es true, el admin verá un FLAG especial
-            }
-        }),
-        prisma.user.update({
-            where: { id: ownerId },
-            data: { role: 'OWNER' }
-        })
-    ]);
+    const commerce = await prisma.commerce.create({
+        data: {
+            ...commerceData,
+            status: 'PENDING' // Todos van a PENDING para revisión manual del admin
+        }
+    });
 
     // Si el contenido fue flagueado, podríamos notificar al admin aquí
     if (moderationResult.requiresReview) {
@@ -143,16 +136,28 @@ export const createCommerceModel = async (data, ownerId) => {
  * Valida un comercio (solo ADMIN).
  */
 export const validateCommerceModel = async (id, adminId, status, reason) => {
-    return prisma.commerce.update({
-        where: { id: parseInt(id) },
-        data: {
-            status,
-            validationReason: reason,
-            validatedById: adminId,
-            validatedAt: new Date(),
-            ...(status === 'REJECTED' && { isActive: false })
-        },
-        include: { owner: true }
+    return prisma.$transaction(async (tx) => {
+        const commerce = await tx.commerce.update({
+            where: { id: parseInt(id) },
+            data: {
+                status,
+                validationReason: reason,
+                validatedById: adminId,
+                validatedAt: new Date(),
+                ...(status === 'REJECTED' && { isActive: false })
+            },
+            include: { owner: true }
+        });
+
+        // Si se aprueba, promovemos al usuario a OWNER
+        if (status === 'ACTIVE') {
+            await tx.user.update({
+                where: { id: commerce.ownerId },
+                data: { role: 'OWNER' }
+            });
+        }
+
+        return commerce;
     });
 };
 
@@ -181,11 +186,39 @@ export const getCommerceByOwnerModel = async (ownerId) => {
 };
 
 /**
- * Actualiza el comercio del usuario autenticado.
- * @param {number} ownerId - ID del dueño.
+ * Actualiza un comercio por su ID.
+ * @param {number} id - ID del comercio.
  * @param {object} data - Datos a actualizar.
- * @returns {Promise<Object>} El comercio actualizado.
+ * @param {number} userId - ID del usuario que solicita la actualización.
+ * @param {string} userRole - Rol del usuario.
  */
+export const updateCommerceModel = async (id, data, userId, userRole) => {
+    // 1. Buscar el comercio
+    const commerce = await prisma.commerce.findUnique({
+        where: { id: parseInt(id) }
+    });
+
+    if (!commerce) {
+        throwError('Commerce not found.', 404);
+    }
+
+    // 2. Verificar permisos: Solo el dueño o un ADMIN pueden editar
+    if (commerce.ownerId !== userId && userRole !== 'ADMIN') {
+        throwError('You do not have permission to update this commerce.', 403);
+    }
+
+    // 3. Limpiar datos (evitar que el dueño se auto-apruebe o cambie campos sensibles)
+    const { ownerId: _, status, isVerified, planId, ...updateData } = data;
+
+    // Si es ADMIN, sí podría permitirle cambiar status o planId si lo pasamos por aquí, 
+    // pero por ahora mantenemos la lógica de negocio separada.
+    
+    return prisma.commerce.update({
+        where: { id: parseInt(id) },
+        data: userRole === 'ADMIN' ? { ...updateData, status, planId, isVerified } : updateData
+    });
+};
+
 export const updateCommerceByOwnerModel = async (ownerId, data) => {
     try {
         // Excluimos campos que el dueño no debería poder cambiar directamente.

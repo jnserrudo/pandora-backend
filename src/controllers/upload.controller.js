@@ -15,8 +15,11 @@ export const uploadImageController = async (req, res, next) => {
             folder: 'pandora_app', // Opcional: para organizar en una carpeta
         });
 
-        // Devolvemos la URL segura
-        return res.json({ imageUrl: result.secure_url });
+        // Devolvemos la URL segura con ambos campos para compatibilidad con distintos componentes
+        return res.json({ 
+            url: result.secure_url,
+            imageUrl: result.secure_url 
+        });
 
     } catch (error) {
         next(error);

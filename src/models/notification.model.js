@@ -20,10 +20,7 @@ export const createNotificationModel = async (userId, type, message, referenceId
 export const getUserNotificationsModel = async (userId) => {
     return prisma.notification.findMany({
         where: { userId: parseInt(userId) },
-        orderBy: [
-            { isRead: 'asc' }, // false (0) viene antes que true (1) en orden ascendente? No, false < true, so asc is false then true.
-            { createdAt: 'desc' }
-        ]
+        orderBy: { createdAt: 'desc' }
     });
 };
 

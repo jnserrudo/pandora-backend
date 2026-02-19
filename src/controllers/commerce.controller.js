@@ -108,6 +108,18 @@ export const getMyCommerce = async (req, res) => {
     }
 };
 
+export const updateCommerce = async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log("updateCommerce by ID:", id, "user:", req.user.id);
+        const updatedCommerce = await commerceModel.updateCommerceModel(id, req.body, req.user.id, req.user.role);
+        res.status(200).json(updatedCommerce);
+    } catch (error) {
+        console.log(error);
+        res.status(error.statusCode || 500).json({ message: error.message });
+    }
+};
+
 export const updateMyCommerce = async (req, res) => {
     try {
         console.log("updateMyCommerce", req.user.id);

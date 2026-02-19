@@ -6,6 +6,7 @@ import {
     getCommerceById,
     createCommerce,
     getMyCommerce,
+    updateCommerce,
     updateMyCommerce,
     validateCommerce,
     getPendingCommerces,
@@ -30,7 +31,7 @@ router.get('/commerces', getCommerces);
 // Obtener el comercio del usuario logueado.
 // NOTA: Esta ruta debe ir ANTES que la ruta genérica con :id.
 // GET /api/commerces/me
-router.get('/commerces/me', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), getMyCommerce);
+router.get('/commerces/me', authenticateToken, authorizeRole(['USER', 'OWNER', 'ADMIN']), getMyCommerce);
 
 // Obtener comercios pendientes (SOLO ADMIN)
 // GET /api/commerces/pending
@@ -39,6 +40,10 @@ router.get('/commerces/pending', authenticateToken, authorizeRole(['ADMIN']), ge
 // Actualizar el comercio del usuario logueado.
 // PUT /api/commerces/me
 router.put('/commerces/me', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), updateMyCommerce);
+
+// Actualizar un comercio específico por su ID.
+// PUT /api/commerces/:id
+router.put('/commerces/:id', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), updateCommerce);
 
 // Crear un nuevo comercio.
 // POST /api/commerces
