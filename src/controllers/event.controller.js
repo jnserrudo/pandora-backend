@@ -1,4 +1,6 @@
 import * as eventModel from '../models/event.model.js';
+import * as auditService from '../services/audit.service.js';
+import prisma from '../db/prismaClient.js';
 
 // --- CONTROLADORES PÚBLICOS ---
 
@@ -28,6 +30,17 @@ export const getEventById = async (req, res) => {
 export const createEvent = async (req, res) => {
     try {
         const event = await eventModel.createEventModel(req.body, req.user.id);
+        
+        // Auditoría
+        await auditService.createLog({
+            userId: req.user.id,
+            action: 'CREATE',
+            resourceType: 'EVENT',
+            resourceId: event.id,
+            newData: event,
+            ipAddress: req.ip
+        });
+
         res.status(201).json(event);
     } catch (error) {
         console.log(error);
@@ -38,7 +51,20 @@ export const createEvent = async (req, res) => {
 export const updateEvent = async (req, res) => {
     try {
         const { id } = req.params;
+        const oldEvent = await prisma.event.findUnique({ where: { id: parseInt(id) } });
         const updatedEvent = await eventModel.updateEventModel(id, req.body, req.user.id);
+        
+        // Auditoría
+        await auditService.createLog({
+            userId: req.user.id,
+            action: 'UPDATE',
+            resourceType: 'EVENT',
+            resourceId: updatedEvent.id,
+            oldData: oldEvent,
+            newData: updatedEvent,
+            ipAddress: req.ip
+        });
+
         res.status(200).json(updatedEvent);
     } catch (error) {
         console.log(error);
@@ -49,8 +75,20 @@ export const updateEvent = async (req, res) => {
 export const deleteEvent = async (req, res) => {
     try {
         const { id } = req.params;
+        const oldEvent = await prisma.event.findUnique({ where: { id: parseInt(id) } });
         await eventModel.deleteEventModel(id, req.user.id);
-        res.status(204).send(); // 204 No Content es la respuesta estándar para un delete exitoso.
+        
+        // Auditoría
+        await auditService.createLog({
+            userId: req.user.id,
+            action: 'DELETE',
+            resourceType: 'EVENT',
+            resourceId: parseInt(id),
+            oldData: oldEvent,
+            ipAddress: req.ip
+        });
+
+        res.status(204).send();
     } catch (error) {
         console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message });

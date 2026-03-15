@@ -1,5 +1,7 @@
 import * as submissionModel from '../models/submission.model.js';
 import * as notificationModel from '../models/notification.model.js';
+import * as emailService from '../services/email.service.js';
+import * as auditService from '../services/audit.service.js';
 import prisma from '../db/prismaClient.js';
 import { throwError } from '../utils/error.utils.js';
 
@@ -26,7 +28,10 @@ export const createSubmission = async (req, res) => {
 
         res.status(201).json(submission);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Error in createSubmission:", error);
+        const statusCode = error.statusCode || 500;
+        const message = statusCode === 500 ? "Error interno del servidor" : error.message;
+        res.status(statusCode).json({ message });
     }
 };
 
@@ -35,7 +40,10 @@ export const getSubmissions = async (req, res) => {
         const submissions = await submissionModel.getAllSubmissionsModel();
         res.status(200).json(submissions);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Error in getSubmissions:", error);
+        const statusCode = error.statusCode || 500;
+        const message = statusCode === 500 ? "Error interno del servidor" : error.message;
+        res.status(statusCode).json({ message });
     }
 };
 
@@ -61,12 +69,22 @@ export const replySubmission = async (req, res) => {
         // --- MANEJO DE EFECTOS SECUNDARIOS ---
         
         // 1. Notificar al usuario del cambio de estado/respuesta
-        if (submission.userId) {
+        if (submission.userId && submission.user) {
+            // Notificación interna
             await notificationModel.createNotificationModel(
                 submission.userId,
                 'SUBMISSION_UPDATED',
                 `Tu solicitud de tipo ${submission.type} ha sido actualizada a estado: ${submission.status}`,
                 submission.id
+            );
+
+            // Notificación por EMAIL
+            await emailService.notifySubmissionUpdate(
+                submission.user.email,
+                submission.user.name,
+                submission.type,
+                submission.status,
+                adminResponse
             );
         }
 
@@ -87,7 +105,7 @@ export const replySubmission = async (req, res) => {
                 });
 
                 // Registrar en PlanHistory
-                await prisma.planHistory.create({
+                const historyEntry = await prisma.planHistory.create({
                     data: {
                         commerceId: commerce.id,
                         oldLevel: commerce.planLevel,
@@ -98,12 +116,26 @@ export const replySubmission = async (req, res) => {
                         paymentProof: submission.attachmentUrl
                     }
                 });
+
+                // REGISTRO DE AUDITORÍA GLOBAL
+                await auditService.createLog({
+                    userId: req.user.id,
+                    action: 'PLAN_UPGRADE',
+                    resourceType: 'COMMERCE',
+                    resourceId: commerce.id,
+                    oldData: { planLevel: commerce.planLevel },
+                    newData: { planLevel: newLevel, planHistoryId: historyEntry.id },
+                    ipAddress: req.ip
+                });
             }
         }
 
         res.status(200).json(submission);
     } catch (error) {
-        res.status(error.statusCode || 500).json({ message: error.message });
+        console.error("Error in replySubmission:", error);
+        const statusCode = error.statusCode || 500;
+        const message = statusCode === 500 ? "Error interno del servidor" : error.message;
+        res.status(statusCode).json({ message });
     }
 };
 

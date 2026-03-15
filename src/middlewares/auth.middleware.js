@@ -12,7 +12,7 @@ export const authenticateToken = (req, res, next) => {
   const decoded = verifyAccessToken(token);
 
   if (!decoded) {
-    return res.status(403).json({ message: 'Invalid or expired Access Token.' });
+    return res.status(401).json({ message: 'Invalid or expired Access Token.' });
   }
 
   req.user = decoded; // Attach user information to the request object

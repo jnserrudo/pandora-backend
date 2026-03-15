@@ -60,6 +60,18 @@ export const updateCommentModel = async (id, data) => {
 };
 
 /**
+ * Respuesta del comercio a un comentario
+ */
+export const replyCommentModel = async (id, replyText) => {
+  return await prisma.commerceComment.update({
+    where: { id: parseInt(id) },
+    data: {
+      commerceReply: replyText
+    }
+  });
+};
+
+/**
  * Eliminar comentario (solo admin)
  */
 export const deleteCommentModel = async (id) => {

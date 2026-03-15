@@ -1,4 +1,6 @@
 import * as articleModel from '../models/article.model.js';
+import * as auditService from '../services/audit.service.js';
+import prisma from '../db/prismaClient.js';
 
 // --- CONTROLADORES PÚBLICOS ---
 
@@ -39,6 +41,17 @@ export const getArticleBySlug = async (req, res) => {
 export const createArticle = async (req, res) => {
     try {
         const article = await articleModel.createArticleModel(req.body);
+        
+        // Auditoría
+        await auditService.createLog({
+            userId: req.user.id,
+            action: 'CREATE',
+            resourceType: 'ARTICLE',
+            resourceId: article.id,
+            newData: article,
+            ipAddress: req.ip
+        });
+
         res.status(201).json(article);
     } catch (error) {
         res.status(error.statusCode || 500).json({ message: error.message });
@@ -48,7 +61,20 @@ export const createArticle = async (req, res) => {
 export const updateArticle = async (req, res) => {
     try {
         const { id } = req.params;
+        const oldArticle = await prisma.article.findUnique({ where: { id: parseInt(id) } });
         const updatedArticle = await articleModel.updateArticleModel(id, req.body);
+        
+        // Auditoría
+        await auditService.createLog({
+            userId: req.user.id,
+            action: 'UPDATE',
+            resourceType: 'ARTICLE',
+            resourceId: updatedArticle.id,
+            oldData: oldArticle,
+            newData: updatedArticle,
+            ipAddress: req.ip
+        });
+
         res.status(200).json(updatedArticle);
     } catch (error) {
         res.status(error.statusCode || 500).json({ message: error.message });
@@ -58,7 +84,19 @@ export const updateArticle = async (req, res) => {
 export const deleteArticle = async (req, res) => {
     try {
         const { id } = req.params;
+        const oldArticle = await prisma.article.findUnique({ where: { id: parseInt(id) } });
         await articleModel.deleteArticleModel(id);
+        
+        // Auditoría
+        await auditService.createLog({
+            userId: req.user.id,
+            action: 'DELETE',
+            resourceType: 'ARTICLE',
+            resourceId: parseInt(id),
+            oldData: oldArticle,
+            ipAddress: req.ip
+        });
+
         res.status(204).send();
     } catch (error) {
         res.status(error.statusCode || 500).json({ message: error.message });

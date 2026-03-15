@@ -1,7 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-    previewFeatures = ["fullTextSearch", "fullTextIndex"]
-
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
 }
 
 datasource db {
@@ -21,23 +20,28 @@ model User {
   refreshToken String? @db.Text
 
   // Relación con el comercio que posee
-  commerces  Commerce[]
+  commerces Commerce[]
   // -- RELACIÓN OPUESTA AÑADIDA --
   // Un usuario puede escribir muchos artículos
   articles  Article[]
-  
-  isActive  Boolean  @default(true)
-  validatedCommerces Commerce[] @relation("CommerceValidator")
-  notifications Notification[]
-  submissions   Submission[]
-  
+
+  isActive           Boolean        @default(true)
+  validatedCommerces Commerce[]     @relation("CommerceValidator")
+  notifications      Notification[]
+  submissions        Submission[]
+
   // Nuevas relaciones para feedback
-  comments      CommerceComment[] @relation("UserComments")
-  advisories    CommerceAdvisory[] @relation("AdvisorAdvisories")
+  comments       CommerceComment[]  @relation("UserComments")
+  advisories     CommerceAdvisory[] @relation("AdvisorAdvisories")
   moderationLogs ModerationLog[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  // Relación como ejecutivo de cuentas
+  assignedCommerces Commerce[] @relation("AccountExecutive")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
 }
 
 enum Role {
@@ -49,81 +53,96 @@ enum Role {
 // --- MODELOS DE NEGOCIO PRINCIPALES ---
 
 model Commerce {
-  id          Int              @id @default(autoincrement())
-  name        String           @unique
-  description String           @db.Text
-  address     String
-  phone       String?
-  category    CommerceCategory
+  id               Int     @id @default(autoincrement())
+  name             String  @unique
+  shortDescription String? @db.Text
+  description      String  @db.Text
+  address          String
+  phone            String?
 
-  // -- Campos para Perfil Completo (MVP) --
+  // Categoría principal (para retrocompatibilidad y visualización rápida)
+  category CommerceCategory?
+
+  // -- Campos para Perfil Completo (Nuevos campos de planes) --
   coverImage    String?
-  galleryImages Json? // Antes: String[]. Json es más flexible y estándar
-  website       String?
+  galleryImages Json?
+  videoUrl      String?
+  whatsapp      String?
+  website       String? // Link Externo
   instagram     String?
   facebook      String?
+  externalLink  String? // Menú PDF, Linktree, etc.
+  attributes    Json? // ["pet_friendly", "wifi", "vegano", etc.]
 
   // -- Campos para Funcionalidades Futuras --
-  latitude     Float? // Para mapas
-  longitude    Float? // Para mapas
-  openingHours Json? // Para horarios complejos (ej. L-V: 9-18, S: 10-14)
-  isVerified   Boolean        @default(false) // Para la insignia "Socio Pandora"
-  status       CommerceStatus @default(PENDING) // Para activar/desactivar locales
-  isActive     Boolean        @default(true)   // Borrado lógico
+  latitude     Float?
+  longitude    Float?
+  openingHours Json?
+  isVerified   Boolean        @default(false)
+  status       CommerceStatus @default(PENDING)
+  isActive     Boolean        @default(true)
   planLevel    Int            @default(1)
 
   // -- Campos de Feedback y Visibilidad --
-  isFeatured      Boolean  @default(false) // Destacado en home (beneficio plan alto)
-  featuredUntil   DateTime? // Hasta cuándo está destacado
-  totalComments   Int      @default(0) // Calculado automáticamente
-  averageRating   Float? // Promedio de ratings de comentarios
+  isFeatured    Boolean   @default(false)
+  featuredUntil DateTime?
+  totalComments Int       @default(0)
+  averageRating Float?
 
-  // Auditoría
+  // Auditoría y Gestión
   validatedBy      User?     @relation("CommerceValidator", fields: [validatedById], references: [id])
   validatedById    Int?
   validationReason String?   @db.Text
   validatedAt      DateTime?
 
+  accountExecutive   User? @relation("AccountExecutive", fields: [accountExecutiveId], references: [id])
+  accountExecutiveId Int?
+
   // -- Relaciones --
   owner   User @relation(fields: [ownerId], references: [id])
-  ownerId Int  
+  ownerId Int
 
-  events Event[]
+  branches       Branch[]
+  products       Product[]
+  faqs           FAQ[]
+  categories     Category[]
+  events         Event[]
   advertisements Advertisement[]
-  comments       CommerceComment[] // Nueva relación
-  advisories     CommerceAdvisory[] // Nueva relación
+  comments       CommerceComment[]
+  advisories     CommerceAdvisory[]
 
   // -- Suscripción y Planes --
-  plan            Plan?           @relation(fields: [planId], references: [id])
-  planId          Int?
-  history         PlanHistory[]
+  plan    Plan?         @relation(fields: [planId], references: [id])
+  planId  Int?
+  history PlanHistory[]
+
+  paymentProof String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  // --- ÍNDICE DE TEXTO COMPLETO AÑADIDO ---
-  @@fulltext([name, description])
+
+  @@fulltext([name, description, shortDescription])
 }
 
 model Event {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String   @db.Text
-  startDate   DateTime
-  endDate     DateTime
-  coverImage  String?
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String   @db.Text
+  startDate     DateTime
+  endDate       DateTime
+  coverImage    String?
   galleryImages Json? // Antes: String[]. Json es más flexible y estándar
-  address     String? // ¡AGREGADO! Campo opcional para la dirección del evento
-  location    String? // ¡AGREGADO! Referencia específica (ej: Planta Alta)
+  address       String? // ¡AGREGADO! Campo opcional para la dirección del evento
+  location      String? // ¡AGREGADO! Referencia específica (ej: Planta Alta)
 
   // -- Campos para Funcionalidades Futuras --
   ticketUrl String? // Link para comprar entradas
   price     Decimal?    @db.Decimal(10, 2) // Precio del evento
   status    EventStatus @default(SCHEDULED) // Para manejar el estado del evento
-  isActive  Boolean     @default(true)      // Borrado lógico
-  
+  isActive  Boolean     @default(true) // Borrado lógico
 
-  latitude    Float? // Para mapas
-  longitude   Float? // Para mapas
+  latitude  Float? // Para mapas
+  longitude Float? // Para mapas
 
   // -- Relaciones --
   commerce   Commerce @relation(fields: [commerceId], references: [id])
@@ -131,6 +150,7 @@ model Event {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   // --- ÍNDICE DE TEXTO COMPLETO AÑADIDO ---
   @@fulltext([name, description])
 }
@@ -156,6 +176,7 @@ model Article {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   // --- ÍNDICE DE TEXTO COMPLETO AÑADIDO ---
   @@fulltext([title, subtitle, content])
 }
@@ -200,36 +221,36 @@ enum PublishStatus {
 // --- MODELOS DE PUBLICIDAD Y CONTACTO (NUEVOS) ---
 
 model Advertisement {
-  id          Int      @id @default(autoincrement())
+  id          Int    @id @default(autoincrement())
   title       String
-  description String   @db.Text
-  imageUrl    String   
-  link        String   
-  
-  category    AdvertisementCategory 
-  position    String   // banner_home, sidebar, banner_events, card
-  
-  isActive    Boolean  @default(true)
-  startDate   DateTime
-  endDate     DateTime
-  
-  impressions Int      @default(0)
-  clicks      Int      @default(0)
-  
+  description String @db.Text
+  imageUrl    String
+  link        String
+
+  category AdvertisementCategory
+  position String // banner_home, sidebar, banner_events, card
+
+  isActive  Boolean  @default(true)
+  startDate DateTime
+  endDate   DateTime
+
+  impressions Int @default(0)
+  clicks      Int @default(0)
+
   commerce   Commerce? @relation(fields: [commerceId], references: [id])
   commerceId Int?
-  
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // La funcionalidad de ContactRequest ahora está unificada en el modelo Submission
 // [DELETE] model ContactRequest { ... }
 
 enum AdvertisementCategory {
-  COMMERCE  
-  EXTERNAL  
-  SPONSOR   
+  COMMERCE
+  EXTERNAL
+  SPONSOR
 }
 
 // ContactStatus y ContactInterestType unificados en Submission status/type
@@ -237,151 +258,230 @@ enum AdvertisementCategory {
 // [DELETE] enum ContactStatus { ... }
 
 model Notification {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  user         User     @relation(fields: [userId], references: [id])
-  type         String   // 'NEW_COMMERCE_REQUEST', 'COMMERCE_VALIDATED', etc.
-  message      String   @db.Text
-  referenceId  Int?
-  isRead       Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  type        String // 'NEW_COMMERCE_REQUEST', 'COMMERCE_VALIDATED', etc.
+  message     String   @db.Text
+  referenceId Int?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
 }
 
 model Submission {
-  id              Int       @id @default(autoincrement())
-  userId          Int?      // Opcional para usuarios no logueados (contactos)
-  user            User?     @relation(fields: [userId], references: [id])
-  type            String    // 'CONTACT', 'AD_PROPOSAL', 'MAGAZINE_PROPOSAL', 'PLAN_UPGRADE'
-  name            String?   // Para no logueados
-  email           String?   // Para no logueados
-  phone           String?
-  message         String    @db.Text
-  attachmentUrl   String?   // Comprobante de pago, imagen de ad, PDF de revista
-  adminResponse   String?   @db.Text
-  status          String    @default("PENDING") // 'PENDING', 'RESPONDED', 'ARCHIVED', 'APPROVED', 'REJECTED'
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            Int      @id @default(autoincrement())
+  userId        Int? // Opcional para usuarios no logueados (contactos)
+  user          User?    @relation(fields: [userId], references: [id])
+  type          String // 'CONTACT', 'AD_PROPOSAL', 'MAGAZINE_PROPOSAL', 'PLAN_UPGRADE'
+  name          String? // Para no logueados
+  email         String? // Para no logueados
+  phone         String?
+  message       String   @db.Text
+  attachmentUrl String? // Comprobante de pago, imagen de ad, PDF de revista
+  adminResponse String?  @db.Text
+  status        String   @default("PENDING") // 'PENDING', 'RESPONDED', 'ARCHIVED', 'APPROVED', 'REJECTED'
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Branch {
+  id           Int      @id @default(autoincrement())
+  commerceId   Int
+  commerce     Commerce @relation(fields: [commerceId], references: [id])
+  name         String?
+  address      String
+  latitude     Float?
+  longitude    Float?
+  openingHours Json?
+  phone        String?
+  isMain       Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  commerceId  Int
+  commerce    Commerce @relation(fields: [commerceId], references: [id])
+  name        String
+  description String?  @db.Text
+  price       Decimal? @db.Decimal(10, 2)
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FAQ {
+  id         Int      @id @default(autoincrement())
+  commerceId Int
+  commerce   Commerce @relation(fields: [commerceId], references: [id])
+  question   String
+  answer     String   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique
+  slug        String?    @unique
+  description String?    @db.Text
+  isActive    Boolean    @default(true)
+  commerces   Commerce[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NewsletterSubscription {
+  id     Int     @id @default(autoincrement())
+  email  String  @unique
+  userId Int?
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Plan {
-  id              Int             @id @default(autoincrement())
-  level           Int             @unique
-  name            String
-  price           Float
-  description     String?         @db.Text
-  benefits        String?         @db.Text
-  commerces       Commerce[]
-  history         PlanHistory[]
+  id          Int           @id @default(autoincrement())
+  level       Int           @unique
+  name        String
+  price       Float
+  description String?       @db.Text
+  benefits    String?       @db.Text
+  commerces   Commerce[]
+  history     PlanHistory[]
 }
 
 model Coupon {
-  id              Int             @id @default(autoincrement())
-  code            String          @unique
-  discountPercent Int             @default(0) // 0-100
-  isActive        Boolean         @default(true)
+  id              Int       @id @default(autoincrement())
+  code            String    @unique
+  discountPercent Int       @default(0) // 0-100
+  isActive        Boolean   @default(true)
   expiresAt       DateTime?
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model PlanHistory {
-  id              Int             @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   commerceId      Int
-  commerce        Commerce        @relation(fields: [commerceId], references: [id])
+  commerce        Commerce @relation(fields: [commerceId], references: [id])
   oldLevel        Int
   newLevel        Int
   planId          Int
-  plan            Plan            @relation(fields: [planId], references: [id])
-  couponUsed      String?         // Código del cupón usado
-  discountApplied Float?          // Monto del descuento
-  totalPaid       Float           // Monto final pagado
-  method          String          // 'NORMAL', 'OFFER', 'COUPON', 'ADMIN_ADJUSTMENT'
-  paymentProof    String?         // URL del comprobante
-  createdAt       DateTime        @default(now())
+  plan            Plan     @relation(fields: [planId], references: [id])
+  couponUsed      String? // Código del cupón usado
+  discountApplied Float? // Monto del descuento
+  totalPaid       Float // Monto final pagado
+  method          String // 'NORMAL', 'OFFER', 'COUPON', 'ADMIN_ADJUSTMENT'
+  paymentProof    String? // URL del comprobante
+  createdAt       DateTime @default(now())
 }
 
 // --- SISTEMA DE FEEDBACK PARA COMERCIOS ---
 
 model CommerceComment {
-  id          Int      @id @default(autoincrement())
-  commerceId  Int
-  commerce    Commerce @relation(fields: [commerceId], references: [id])
-  
+  id         Int      @id @default(autoincrement())
+  commerceId Int
+  commerce   Commerce @relation(fields: [commerceId], references: [id])
+
   // Quién comentó (puede ser usuario anónimo o logueado)
-  userId      Int?
-  user        User?    @relation("UserComments", fields: [userId], references: [id])
-  userName    String?  // Para usuarios no logueados
-  
+  userId   Int?
+  user     User?   @relation("UserComments", fields: [userId], references: [id])
+  userName String? // Para usuarios no logueados
+
   // Contenido
-  comment     String   @db.Text
-  rating      Int?     // Opcional: 1-5 estrellas
-  category    String?  // 'SERVICIO', 'AMBIENTE', 'CALIDAD', 'PRECIO', 'OTRO'
-  
+  comment  String  @db.Text
+  rating   Int? // Opcional: 1-5 estrellas
+  category String? // 'SERVICIO', 'AMBIENTE', 'CALIDAD', 'PRECIO', 'OTRO'
+
   // Metadata para admins
-  isRead      Boolean  @default(false)
-  adminNotes  String?  @db.Text  // Notas internas del admin
-  priority    String   @default("NORMAL") // 'LOW', 'NORMAL', 'HIGH', 'URGENT'
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isRead     Boolean @default(false)
+  adminNotes String? @db.Text // Notas internas del admin
+  priority   String  @default("NORMAL") // 'LOW', 'NORMAL', 'HIGH', 'URGENT'
+
+  // Respuesta del comercio (Plata+)
+  commerceReply String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model CommerceAdvisory {
-  id              Int      @id @default(autoincrement())
-  commerceId      Int
-  commerce        Commerce @relation(fields: [commerceId], references: [id])
+  id         Int      @id @default(autoincrement())
+  commerceId Int
+  commerce   Commerce @relation(fields: [commerceId], references: [id])
 
-  
-  advisorId       Int
-  advisor         User     @relation("AdvisorAdvisories", fields: [advisorId], references: [id])
-  
+  advisorId Int
+  advisor   User @relation("AdvisorAdvisories", fields: [advisorId], references: [id])
+
   // Contenido de la asesoría
   title           String
-  content         String   @db.Text
-  recommendations String   @db.Text
-  
+  content         String @db.Text
+  recommendations String @db.Text
+
   // Métricas en el momento de la asesoría
-  metricsSnapshot Json?    // { impressions, clicks, ctr, comments, avgRating }
-  
+  metricsSnapshot Json? // { impressions, clicks, ctr, comments, avgRating }
+
   // Seguimiento
-  status          String   @default("SENT") // 'SENT', 'READ', 'IMPLEMENTED'
-  implementedAt   DateTime?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status        String    @default("SENT") // 'SENT', 'READ', 'IMPLEMENTED'
+  implementedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // --- MODERACIÓN CON IA (AI GUARD) ---
 
 model ModerationLog {
-  id              Int      @id @default(autoincrement())
-  resourceType    String   // 'ARTICLE', 'COMMERCE', 'EVENT'
-  resourceId      Int?     // Null si fue rechazado antes de crearse
-  status          String   // 'APPROVED', 'FLAGGED', 'REJECTED'
-  
+  id           Int    @id @default(autoincrement())
+  resourceType String // 'ARTICLE', 'COMMERCE', 'EVENT'
+  resourceId   Int? // Null si fue rechazado antes de crearse
+  status       String // 'APPROVED', 'FLAGGED', 'REJECTED'
+
   // Resultados de análisis
-  basicFilterResult Json?  // { blocked: bool, reason: string }
-  aiResult          Json?  // Respuesta completa de OpenAI Moderation
-  
+  basicFilterResult Json? // { blocked: bool, reason: string }
+  aiResult          Json? // Respuesta completa de OpenAI Moderation
+
   // Metadata
-  analyzedText      String  @db.Text // El texto que se analizó
-  
+  analyzedText String @db.Text // El texto que se analizó
+
   // Revisión administrativa (solo para FLAGGED)
-  adminNotes        String? @db.Text
-  reviewedBy        Int?
-  reviewer          User?   @relation(fields: [reviewedBy], references: [id])
-  reviewedAt        DateTime?
-  
-  createdAt         DateTime @default(now())
+  adminNotes String?   @db.Text
+  reviewedBy Int?
+  reviewer   User?     @relation(fields: [reviewedBy], references: [id])
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
 }
+
 // --- SISTEMA DE ANALÍTICAS DE BÚSQUEDA ---
 
 model SearchQuery {
-  id            Int      @id @default(autoincrement())
-  term          String   @unique
-  count         Int      @default(1)
-  lastSearched  DateTime @default(now())
-  
+  id           Int      @id @default(autoincrement())
+  term         String   @unique
+  count        Int      @default(1)
+  lastSearched DateTime @default(now())
+
   @@fulltext([term])
+}
+
+model AuditLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int? // Quién hizo la acción
+  user         User?    @relation(fields: [userId], references: [id])
+  action       String // 'CREATE', 'UPDATE', 'DELETE', 'STATUS_CHANGE', 'LOGIN'
+  resourceType String // 'COMMERCE', 'USER', 'PLAN', 'COUPON', 'SUBMISSION', 'ARTICLE', 'EVENT', 'PRODUCT', 'BRANCH', 'FAQ'
+  resourceId   Int? // ID del registro afectado
+  oldData      Json? // Estado ANTES del cambio
+  newData      Json? // Estado DESPUÉS del cambio
+  ipAddress    String? // Metadata de conexión
+  createdAt    DateTime @default(now())
 }

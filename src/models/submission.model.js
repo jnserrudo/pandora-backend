@@ -42,7 +42,8 @@ export const updateSubmissionStatusModel = async (id, status, adminResponse = nu
             status,
             ...(adminResponse && { adminResponse }),
             updatedAt: new Date()
-        }
+        },
+        include: { user: { select: { name: true, email: true } } }
     });
 };
 

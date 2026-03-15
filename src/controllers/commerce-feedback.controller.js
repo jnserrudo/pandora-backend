@@ -1,5 +1,6 @@
 import * as feedbackModel from '../models/commerce-feedback.model.js';
 import prisma from '../db/prismaClient.js';
+import * as auditService from '../services/audit.service.js';
 
 // ==================== COMENTARIOS ====================
 
@@ -11,12 +12,30 @@ export const createComment = async (req, res) => {
     const { id } = req.params;
     const { comment, rating, category, userName } = req.body;
     
+    // Ya no es login obligatorio, permitimos anónimos
+    const userId = req.user ? req.user.id : null;
+
+    // Verificar si el comercio existe y obtener su dueño
+    const commerce = await prisma.commerce.findUnique({
+      where: { id: parseInt(id) },
+      select: { planLevel: true, name: true, ownerId: true }
+    });
+
+    if (!commerce) {
+      return res.status(404).json({ message: "Comercio no encontrado" });
+    }
+
+    // Prevenir auto-comentario del dueño (solo si está logueado)
+    if (userId && commerce.ownerId === userId) {
+      return res.status(403).json({ message: "No puedes dejar un comentario en tu propio comercio." });
+    }
+
     const commentData = {
       commerceId: parseInt(id),
       comment,
       rating: rating || null,
       category: category || 'OTRO',
-      userId: req.user?.userId || null,
+      userId: req.user?.id || null,
       userName: req.user ? null : (userName || 'Anónimo')
     };
 
@@ -63,8 +82,68 @@ export const markCommentAsRead = async (req, res) => {
 export const updateComment = async (req, res) => {
   try {
     const { id } = req.params;
+    const oldComment = await prisma.commerceComment.findUnique({ where: { id: parseInt(id) } });
     const comment = await feedbackModel.updateCommentModel(id, req.body);
+    
+    // Auditoría
+    await auditService.createLog({
+        userId: req.user.id,
+        action: 'UPDATE',
+        resourceType: 'COMMENT',
+        resourceId: comment.id,
+        oldData: oldComment,
+        newData: comment,
+        ipAddress: req.ip
+    });
+
     res.status(200).json(comment);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+/**
+ * Respuesta pública del Comercio al Comentario
+ */
+export const replyComment = async (req, res) => {
+  try {
+    const { id } = req.params; // ID del comentario
+    const { commerceReply } = req.body;
+    const userId = req.user.id;
+
+    // Obtener el comentario para saber a qué comercio pertenece
+    const comment = await prisma.commerceComment.findUnique({
+      where: { id: parseInt(id) },
+      include: { commerce: true }
+    });
+
+    if (!comment) return res.status(404).json({ message: "Comentario no encontrado" });
+
+    // Validar propietario (si no es admin)
+    if (req.user.role !== 'ADMIN' && comment.commerce.ownerId !== userId) {
+      return res.status(403).json({ message: "No tienes permiso para responder en este comercio." });
+    }
+
+    // Validar plan de permisos del comercio (Debe ser Plata o superior)
+    if (comment.commerce.planLevel < 2) {
+      return res.status(403).json({ message: "Tu plan actual no te permite responder comentarios (Requiere Plata o superior)." });
+    }
+
+    const oldComment = await prisma.commerceComment.findUnique({ where: { id: parseInt(id) } });
+    const updatedComment = await feedbackModel.replyCommentModel(id, commerceReply);
+    
+    // Auditoría
+    await auditService.createLog({
+        userId: req.user.id,
+        action: 'REPLY',
+        resourceType: 'COMMENT',
+        resourceId: updatedComment.id,
+        oldData: { commerceReply: oldComment.commerceReply },
+        newData: { commerceReply },
+        ipAddress: req.ip
+    });
+
+    res.status(200).json(updatedComment);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -76,7 +155,19 @@ export const updateComment = async (req, res) => {
 export const deleteComment = async (req, res) => {
   try {
     const { id } = req.params;
+    const oldComment = await prisma.commerceComment.findUnique({ where: { id: parseInt(id) } });
     await feedbackModel.deleteCommentModel(id);
+    
+    // Auditoría
+    await auditService.createLog({
+        userId: req.user.id,
+        action: 'DELETE',
+        resourceType: 'COMMENT',
+        resourceId: parseInt(id),
+        oldData: oldComment,
+        ipAddress: req.ip
+    });
+
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -91,7 +182,7 @@ export const deleteComment = async (req, res) => {
 export const createAdvisory = async (req, res) => {
   try {
     const { id } = req.params;
-    const advisorId = req.user.userId;
+    const advisorId = req.user.id;
     
     // Obtener métricas actuales del comercio
     const metrics = await feedbackModel.getCommerceMetrics(id);
@@ -119,7 +210,7 @@ export const createAdvisory = async (req, res) => {
 export const getCommerceAdvisories = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const userRole = req.user.role;
 
     // Verificar si el usuario es dueño o admin
@@ -151,7 +242,7 @@ export const updateAdvisoryStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const userRole = req.user.role;
 
     // Obtener la asesoría para saber a qué comercio pertenece
@@ -169,7 +260,20 @@ export const updateAdvisoryStatus = async (req, res) => {
       return res.status(403).json({ message: "No tienes permiso para modificar esta asesoría" });
     }
     
+    const oldAdvisory = await prisma.commerceAdvisory.findUnique({ where: { id: parseInt(id) } });
     const updatedAdvisory = await feedbackModel.updateAdvisoryStatusModel(id, status);
+    
+    // Auditoría
+    await auditService.createLog({
+        userId: req.user.id,
+        action: 'STATUS_CHANGE',
+        resourceType: 'ADVISORY',
+        resourceId: updatedAdvisory.id,
+        oldData: { status: oldAdvisory.status },
+        newData: { status },
+        ipAddress: req.ip
+    });
+
     res.status(200).json(updatedAdvisory);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -213,7 +317,23 @@ export const setCommerceFeatured = async (req, res) => {
     const { id } = req.params;
     const { days } = req.body;
     
+    const oldCommerce = await prisma.commerce.findUnique({ 
+        where: { id: parseInt(id) },
+        select: { id: true, isFeatured: true, featuredUntil: true }
+    });
     const commerce = await feedbackModel.setCommerceFeaturedModel(id, days);
+    
+    // Auditoría
+    await auditService.createLog({
+        userId: req.user.id,
+        action: 'FEATURED_STATUS',
+        resourceType: 'COMMERCE',
+        resourceId: commerce.id,
+        oldData: oldCommerce,
+        newData: { isFeatured: commerce.isFeatured, featuredUntil: commerce.featuredUntil },
+        ipAddress: req.ip
+    });
+
     res.status(200).json(commerce);
   } catch (error) {
     res.status(400).json({ message: error.message });

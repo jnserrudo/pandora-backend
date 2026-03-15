@@ -10,7 +10,8 @@ import {
   updateAdvisoryStatus,
   getCommerceMetrics,
   getFeaturedCommerces,
-  setCommerceFeatured
+  setCommerceFeatured,
+  replyComment
 } from '../controllers/commerce-feedback.controller.js';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 import { authorizeRole } from '../middlewares/authorize.middleware.js';
@@ -52,6 +53,14 @@ router.delete(
   authenticateToken,
   authorizeRole(['ADMIN']),
   deleteComment
+);
+
+// OWNER/ADMIN (Plan Plata+): Responder a un comentario
+router.patch(
+  '/comments/:id/reply',
+  authenticateToken,
+  authorizeRole(['OWNER', 'ADMIN']),
+  replyComment
 );
 
 // ========== ASESORÍAS ==========

@@ -59,7 +59,26 @@ async function main() {
     create: { name: 'Entrevistas', slug: 'entrevistas' }
   });
 
-  // 3. Create Articles
+  // 3. Create Commerce Categories (Relational Table)
+  const categories = [
+    { name: 'Vida Nocturna', slug: 'VIDA_NOCTURNA' },
+    { name: 'Gastronomía', slug: 'GASTRONOMIA' },
+    { name: 'Salas y Teatro', slug: 'SALAS_Y_TEATRO' }
+  ];
+
+  for (const cat of categories) {
+    await prisma.category.upsert({
+      where: { name: cat.name },
+      update: {},
+      create: {
+        name: cat.name,
+        slug: cat.slug,
+        description: `Categoría de tipo ${cat.name}`
+      }
+    });
+  }
+
+  // 4. Create Articles
   await prisma.article.create({
     data: {
       title: 'El resurgir de la noche en Salta',
@@ -69,6 +88,7 @@ async function main() {
       coverImage: 'https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=1024&auto=format&fit=crop',
       categoryId: catNews.id,
       authorId: admin.id,
+      authorName: admin.name,
       isActive: true
     }
   });
@@ -82,6 +102,7 @@ async function main() {
       coverImage: 'https://images.unsplash.com/photo-1583394838336-acd977730f90?q=80&w=1024&auto=format&fit=crop',
       categoryId: catInterviews.id,
       authorId: admin.id,
+      authorName: admin.name,
       isActive: true
     }
   });

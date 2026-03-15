@@ -1,4 +1,6 @@
 import * as authModel from '../models/auth.model.js';
+import * as auditService from '../services/audit.service.js';
+import prisma from '../db/prismaClient.js';
 
 export const registerUser = async (req, res) => {
     try {
@@ -9,6 +11,16 @@ export const registerUser = async (req, res) => {
         const newUser = await authModel.registerUserService(req.body);
         console.log(newUser);
         res.status(201).json({ message: 'User registered successfully!', user: newUser });
+
+        // Auditoría
+        await auditService.createLog({
+            userId: newUser.id,
+            action: 'CREATE',
+            resourceType: 'USER',
+            resourceId: newUser.id,
+            newData: newUser,
+            ipAddress: req.ip
+        });
     } catch (error) {
         console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
@@ -24,6 +36,16 @@ export const loginUser = async (req, res) => {
         const tokens = await authModel.loginUserService(identifier, password);
         console.log('logeado');
         res.status(200).json({ message: 'Login successful!', ...tokens });
+
+        // Auditoría
+        const user = await prisma.user.findFirst({ where: { OR: [{ email: identifier }, { username: identifier }] } });
+        await auditService.createLog({
+            userId: user?.id,
+            action: 'LOGIN',
+            resourceType: 'USER',
+            resourceId: user?.id,
+            ipAddress: req.ip
+        });
     } catch (error) {
         console.log(error);
         res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
