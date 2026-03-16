@@ -101,8 +101,8 @@ export const getCommerceByIdModel = async (id) => {
             }
         },
     });
-    if (!commerce || commerce.status !== 'ACTIVE' || !commerce.isActive) {
-        throwError('Commerce not found or is not active.', 404);
+    if (!commerce) {
+        throwError('Commerce not found.', 404);
     }
     return commerce;
 };

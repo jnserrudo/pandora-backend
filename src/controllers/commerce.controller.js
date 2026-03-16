@@ -131,12 +131,21 @@ export const validateCommerce = async (req, res) => {
         );
 
         // Notificación por EMAIL al dueño
-        await emailService.notifyCommerceStatusUpdate(
-            commerce.owner.email, 
-            commerce.name, 
-            status, 
-            reason
-        );
+        try {
+            if (commerce && commerce.owner && commerce.owner.email) {
+                await emailService.notifyCommerceStatusUpdate(
+                    commerce.owner.email, 
+                    commerce.name, 
+                    status, 
+                    reason
+                );
+            } else {
+                console.warn(`Could not send email for commerce ${id}: owner or email missing`);
+            }
+        } catch (emailError) {
+            console.error("Error sending validation email:", emailError);
+            // We don't throw here to avoid 500, since validation was successful
+        }
 
         res.status(200).json(commerce);
     } catch (error) {
