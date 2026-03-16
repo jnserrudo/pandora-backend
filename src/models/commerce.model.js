@@ -156,7 +156,7 @@ export const createCommerceModel = async (data, ownerId) => {
                 connect: existingCategories.map(c => ({ id: c.id }))
             };
             // Sincronizar el Enum 'category' principal (retrocompatibilidad)
-            if (!data.category || !categories.includes(data.category)) {
+            if (!data.category) {
                 data.category = existingCategories[0].slug;
             }
         }
@@ -170,7 +170,7 @@ export const createCommerceModel = async (data, ownerId) => {
                 shortDescription: data.shortDescription,
                 address: data.address,
                 phone: data.phone,
-                category: (data.category && categories.includes(data.category)) ? data.category : null, 
+                category: data.category || null, 
                 galleryImages: enforceGalleryLimits(data.galleryImages, finalPlanLevel),
                 website: sanitizeUrl(data.website),
                 videoUrl: sanitizeUrl(data.videoUrl),
@@ -325,10 +325,10 @@ export const updateCommerceModel = async (id, data, userId, userRole) => {
                 status, 
                 planLevel: planLevelFinal, 
                 isVerified,
-                category: (updateData.category && categories.includes(updateData.category)) ? updateData.category : undefined
+                category: updateData.category || undefined
             } : {
                 ...updateData,
-                category: (updateData.category && categories.includes(updateData.category)) ? updateData.category : undefined
+                category: updateData.category || undefined
             }),
             categories: categoryUpdateOptions
         }
