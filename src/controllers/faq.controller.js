@@ -5,7 +5,7 @@ import * as auditService from '../services/audit.service.js';
 export const getFAQsByCommerceId = async (req, res) => {
     try {
         const { commerceId } = req.params;
-        const faqs = await prisma.fAQ.findMany({
+        const faqs = await prisma.faq.findMany({
             where: { commerceId: parseInt(commerceId) },
             orderBy: { createdAt: 'desc' }
         });
@@ -29,7 +29,7 @@ export const createFAQ = async (req, res) => {
             throwError('Tu plan actual no permite gestionar FAQs.', 403);
         }
 
-        const faq = await prisma.fAQ.create({
+        const faq = await prisma.faq.create({
             data: {
                 commerceId: parseInt(commerceId),
                 question,
@@ -67,8 +67,8 @@ export const updateFAQ = async (req, res) => {
             throwError('Tu plan actual no permite gestionar FAQs.', 403);
         }
 
-        const oldFaq = await prisma.fAQ.findUnique({ where: { id: parseInt(id) } });
-        const faq = await prisma.fAQ.update({
+        const oldFaq = await prisma.faq.findUnique({ where: { id: parseInt(id) } });
+        const faq = await prisma.faq.update({
             where: { id: parseInt(id) },
             data: { question, answer }
         });
@@ -103,8 +103,8 @@ export const deleteFAQ = async (req, res) => {
             throwError('Tu plan actual no permite gestionar FAQs.', 403);
         }
 
-        const oldFaq = await prisma.fAQ.findUnique({ where: { id: parseInt(id) } });
-        await prisma.fAQ.delete({
+        const oldFaq = await prisma.faq.findUnique({ where: { id: parseInt(id) } });
+        await prisma.faq.delete({
             where: { id: parseInt(id) }
         });
 

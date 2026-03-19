@@ -16,6 +16,7 @@ model User {
   email        String  @unique
   password     String
   name         String
+  dni          String? // DNI opcional (campo agregado - usuarios existentes quedan con null)
   role         Role    @default(USER)
   refreshToken String? @db.Text
 
@@ -144,9 +145,13 @@ model Event {
   latitude  Float? // Para mapas
   longitude Float? // Para mapas
 
+  // -- Campo Destacado --
+  featured Boolean @default(false) // Evento destacado para mostrar con distintivo especial
+
   // -- Relaciones --
-  commerce   Commerce @relation(fields: [commerceId], references: [id])
-  commerceId Int
+  commerce   Commerce? @relation(fields: [commerceId], references: [id])
+  commerceId Int? // Opcional: permite eventos sin comercio asociado
+  organizerName String? // Nombre del organizador si no hay comercio asociado
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -208,9 +213,12 @@ enum CommerceStatus {
 }
 
 enum EventStatus {
-  SCHEDULED // Programado
-  CANCELLED // Cancelado
-  FINISHED // Finalizado
+  PENDING    // Solicitud enviada, esperando aprobación del admin
+  APPROVED   // Aprobado por el admin - visible al público
+  REJECTED   // Rechazado por el admin
+  SCHEDULED  // Programado (aprobado y activo)
+  CANCELLED  // Cancelado
+  FINISHED   // Finalizado
 }
 
 enum PublishStatus {
