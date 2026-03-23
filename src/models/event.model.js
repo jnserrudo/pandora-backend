@@ -57,12 +57,13 @@ export const getEventByIdModel = async (id) => {
 // --- FUNCIONES PROTEGIDAS (PARA OWNERS/ADMINS) ---
 
 /**
- * Crea un nuevo evento, verificando que el usuario sea el dueño del comercio.
+ * Crea un nuevo evento, verificando que el usuario sea el dueño del comercio o admin.
  * @param {object} data - Datos del evento desde el body.
  * @param {number} ownerId - ID del usuario autenticado.
+ * @param {string} userRole - Rol del usuario autenticado.
  * @returns {Promise<Object>} El nuevo evento creado.
  */
-export const createEventModel = async (data, ownerId) => {
+export const createEventModel = async (data, ownerId, userRole) => {
     const { commerceId, ...eventData } = data;
 
     if (!commerceId) {
@@ -76,7 +77,7 @@ export const createEventModel = async (data, ownerId) => {
     if (!commerce) {
         throwError('Commerce not found.', 404);
     }
-    if (commerce.ownerId !== ownerId) {
+    if (commerce.ownerId !== ownerId && userRole !== 'ADMIN') {
         throwError('Forbidden: You are not the owner of this commerce.', 403);
     }
 
@@ -89,13 +90,14 @@ export const createEventModel = async (data, ownerId) => {
 };
 
 /**
- * Actualiza un evento, verificando que el usuario sea el dueño del comercio.
+ * Actualiza un evento, verificando que el usuario sea el dueño del comercio o admin.
  * @param {number} eventId - ID del evento a actualizar.
  * @param {object} data - Datos a actualizar.
  * @param {number} ownerId - ID del usuario autenticado.
+ * @param {string} userRole - Rol del usuario autenticado.
  * @returns {Promise<Object>} El evento actualizado.
  */
-export const updateEventModel = async (eventId, data, ownerId) => {
+export const updateEventModel = async (eventId, data, ownerId, userRole) => {
     const event = await prisma.event.findUnique({
         where: { id: parseInt(eventId) },
         include: { commerce: true },
@@ -104,7 +106,7 @@ export const updateEventModel = async (eventId, data, ownerId) => {
     if (!event) {
         throwError('Event not found.', 404);
     }
-    if (event.commerce.ownerId !== ownerId) {
+    if (event.commerce.ownerId !== ownerId && userRole !== 'ADMIN') {
         throwError('Forbidden: You do not have permission to update this event.', 403);
     }
     
@@ -118,11 +120,12 @@ export const updateEventModel = async (eventId, data, ownerId) => {
 };
 
 /**
- * Elimina un evento, verificando que el usuario sea el dueño.
+ * Elimina un evento, verificando que el usuario sea el dueño o admin.
  * @param {number} eventId - ID del evento a eliminar.
  * @param {number} ownerId - ID del usuario autenticado.
+ * @param {string} userRole - Rol del usuario autenticado.
  */
-export const deleteEventModel = async (eventId, ownerId) => {
+export const deleteEventModel = async (eventId, ownerId, userRole) => {
     const event = await prisma.event.findUnique({
         where: { id: parseInt(eventId) },
         include: { commerce: true },
@@ -131,7 +134,7 @@ export const deleteEventModel = async (eventId, ownerId) => {
     if (!event) {
         throwError('Event not found.', 404);
     }
-    if (event.commerce.ownerId !== ownerId) {
+    if (event.commerce.ownerId !== ownerId && userRole !== 'ADMIN') {
         throwError('Forbidden: You do not have permission to delete this event.', 403);
     }
 

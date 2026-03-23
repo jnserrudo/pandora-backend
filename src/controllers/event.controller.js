@@ -29,7 +29,7 @@ export const getEventById = async (req, res) => {
 
 export const createEvent = async (req, res) => {
     try {
-        const event = await eventModel.createEventModel(req.body, req.user.id);
+        const event = await eventModel.createEventModel(req.body, req.user.id, req.user.role);
         
         // Auditoría
         await auditService.createLog({
@@ -52,7 +52,7 @@ export const updateEvent = async (req, res) => {
     try {
         const { id } = req.params;
         const oldEvent = await prisma.event.findUnique({ where: { id: parseInt(id) } });
-        const updatedEvent = await eventModel.updateEventModel(id, req.body, req.user.id);
+        const updatedEvent = await eventModel.updateEventModel(id, req.body, req.user.id, req.user.role);
         
         // Auditoría
         await auditService.createLog({
@@ -76,7 +76,7 @@ export const deleteEvent = async (req, res) => {
     try {
         const { id } = req.params;
         const oldEvent = await prisma.event.findUnique({ where: { id: parseInt(id) } });
-        await eventModel.deleteEventModel(id, req.user.id);
+        await eventModel.deleteEventModel(id, req.user.id, req.user.role);
         
         // Auditoría
         await auditService.createLog({
