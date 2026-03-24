@@ -11,4 +11,6 @@ node_modules
 apuntes.txt
 /src/generated/prisma
 
+/scripts
+
 *.sql

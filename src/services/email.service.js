@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import validator from 'validator';
+import { generateVerificationEmailTemplate } from '../utils/emails/VerificationEmail.js';
 
 dotenv.config();
 
@@ -133,5 +134,11 @@ export const notifySubmissionUpdate = async (email, userName, type, status, admi
         </div>
     `;
 
+    return await sendEmail(email, subject, '', html);
+};
+
+export const sendVerificationOTP = async (email, otpCode) => {
+    const subject = "Antigravity - Código de Verificación de Cuenta";
+    const html = generateVerificationEmailTemplate(otpCode);
     return await sendEmail(email, subject, '', html);
 };
