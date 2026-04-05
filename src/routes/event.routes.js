@@ -6,6 +6,8 @@ import {
     updateEvent,
     deleteEvent,
     updateEventStatus,
+    validateEventPayment,
+    getMyEvents,
 } from '../controllers/event.controller.js';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 import { authorizeRole } from '../middlewares/authorize.middleware.js';
@@ -29,6 +31,10 @@ router.get('/events/:id', getEventById);
 // ==         RUTAS PROTEGIDAS                  ==
 // ===============================================
 
+// Obtener eventos del usuario autenticado
+// GET /api/events/my-events
+router.get('/events/my-events', authenticateToken, getMyEvents);
+
 // Crear un nuevo evento (requiere ser OWNER o ADMIN)
 // POST /api/events
 router.post('/events', authenticateToken, authorizeRole(['OWNER', 'ADMIN']), createEvent);
@@ -42,5 +48,8 @@ router.delete('/events/:id', authenticateToken, authorizeRole(['OWNER', 'ADMIN']
 
 // Actualizar status (isActive) - Solo ADMIN
 router.put('/events/:id/status', authenticateToken, authorizeRole(['ADMIN']), updateEventStatus);
+
+// Validar pago de evento - Solo ADMIN
+router.put('/events/:id/validate-payment', authenticateToken, authorizeRole(['ADMIN']), validateEventPayment);
 
 export default router;

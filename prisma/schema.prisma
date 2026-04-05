@@ -152,6 +152,13 @@ model Event {
   // -- Campo Destacado --
   featured Boolean @default(false) // Evento destacado para mostrar con distintivo especial
 
+  // -- Sistema de Monetización (3 Tiers) --
+  eventTier     Int     @default(1) // 1=Básico, 2=Plus, 3=Premium
+  paymentProof  String? @db.Text // URL del comprobante de pago (Plus/Premium)
+  paymentStatus String? @default("PENDING") // PENDING, VALIDATED, REJECTED
+  videoUrl      String? // URL de video YouTube/Vimeo (Premium)
+  externalLink  String? // Enlace externo (Plus/Premium)
+
   // -- Relaciones --
   commerce   Commerce? @relation(fields: [commerceId], references: [id])
   commerceId Int? // Opcional: permite eventos sin comercio asociado

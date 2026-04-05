@@ -153,3 +153,57 @@ export const updateEventStatusModel = async (id, isActive) => {
         data: { isActive }
     });
 };
+
+/**
+ * Valida o rechaza el pago de un evento (solo ADMIN).
+ * @param {number} id - ID del evento.
+ * @param {string} paymentStatus - 'VALIDATED' o 'REJECTED'.
+ * @returns {Promise<Object>} El evento actualizado.
+ */
+export const validateEventPaymentModel = async (id, paymentStatus) => {
+    if (!['VALIDATED', 'REJECTED'].includes(paymentStatus)) {
+        throwError('Invalid payment status. Must be VALIDATED or REJECTED.', 400);
+    }
+
+    const event = await prisma.event.findUnique({
+        where: { id: parseInt(id) }
+    });
+
+    if (!event) {
+        throwError('Event not found.', 404);
+    }
+
+    if (event.eventTier === 1) {
+        throwError('Basic tier events do not require payment validation.', 400);
+    }
+
+    return prisma.event.update({
+        where: { id: parseInt(id) },
+        data: { paymentStatus }
+    });
+};
+
+/**
+ * Obtiene todos los eventos del usuario autenticado.
+ * @param {number} userId - ID del usuario.
+ * @returns {Promise<Array>} Lista de eventos del usuario.
+ */
+export const getMyEventsModel = async (userId) => {
+    return prisma.event.findMany({
+        where: {
+            commerce: {
+                ownerId: userId
+            }
+        },
+        include: {
+            commerce: {
+                select: {
+                    id: true,
+                    name: true,
+                    address: true
+                }
+            }
+        },
+        orderBy: { createdAt: 'desc' }
+    });
+};

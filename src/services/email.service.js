@@ -70,7 +70,7 @@ export const notifyCommerceStatusUpdate = async (email, commerceName, status, re
                 </div>
             </div>
             <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #777; border-top: 1px solid #ddd;">
-                <p>&copy; 2024 Ecosistema Pandora. Todos los derechos reservados.</p>
+                <p>&copy; 2026 Pandora. Todos los derechos reservados.</p>
             </div>
         </div>`
         : `
@@ -84,7 +84,7 @@ export const notifyCommerceStatusUpdate = async (email, commerceName, status, re
                 <p>Podés corregir los datos y volver a enviar la solicitud desde tu panel de usuario.</p>
             </div>
             <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #777; border-top: 1px solid #ddd;">
-                <p>&copy; 2024 Ecosistema Pandora. Todos los derechos reservados.</p>
+                <p>&copy; 2026 Pandora. Todos los derechos reservados.</p>
             </div>
         </div>`;
 
@@ -129,7 +129,7 @@ export const notifySubmissionUpdate = async (email, userName, type, status, admi
                 </div>
             </div>
             <div style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #777; border-top: 1px solid #ddd;">
-                <p>&copy; 2024 Ecosistema Pandora. Todos los derechos reservados.</p>
+                <p>&copy; 2026 Pandora. Todos los derechos reservados.</p>
             </div>
         </div>
     `;
@@ -138,7 +138,7 @@ export const notifySubmissionUpdate = async (email, userName, type, status, admi
 };
 
 export const sendVerificationOTP = async (email, otpCode) => {
-    const subject = "Antigravity - Código de Verificación de Cuenta";
+    const subject = "Pandora - Código de Verificación de Cuenta";
     const html = generateVerificationEmailTemplate(otpCode);
     return await sendEmail(email, subject, '', html);
 };

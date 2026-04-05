@@ -106,3 +106,41 @@ export const updateEventStatus = async (req, res) => {
         res.status(error.statusCode || 500).json({ message: error.message });
     }
 };
+
+// --- CONTROLADORES ADMIN ---
+
+export const validateEventPayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { paymentStatus } = req.body; // 'VALIDATED' o 'REJECTED'
+        
+        const oldEvent = await prisma.event.findUnique({ where: { id: parseInt(id) } });
+        const updatedEvent = await eventModel.validateEventPaymentModel(id, paymentStatus);
+        
+        // Auditoría
+        await auditService.createLog({
+            userId: req.user.id,
+            action: 'UPDATE',
+            resourceType: 'EVENT',
+            resourceId: updatedEvent.id,
+            oldData: { paymentStatus: oldEvent.paymentStatus },
+            newData: { paymentStatus: updatedEvent.paymentStatus },
+            ipAddress: req.ip
+        });
+
+        res.status(200).json(updatedEvent);
+    } catch (error) {
+        console.log(error);
+        res.status(error.statusCode || 500).json({ message: error.message });
+    }
+};
+
+export const getMyEvents = async (req, res) => {
+    try {
+        const events = await eventModel.getMyEventsModel(req.user.id);
+        res.status(200).json(events);
+    } catch (error) {
+        console.log(error);
+        res.status(error.statusCode || 500).json({ message: error.message });
+    }
+};
