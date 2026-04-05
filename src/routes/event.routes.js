@@ -22,18 +22,17 @@ const router = Router();
 // GET /api/events
 router.get('/events', getEvents);
 
-// Obtener un evento específico por su ID
-// GET /api/events/1
-router.get('/events/:id', getEventById);
+// Obtener eventos del usuario autenticado (DEBE IR ANTES DE /events/:id)
+// GET /api/events/my-events
+router.get('/events/my-events', authenticateToken, getMyEvents);
 
+// Obtener un evento específico por su ID
+// GET /api/events/:id
+router.get('/events/:id', getEventById);
 
 // ===============================================
 // ==         RUTAS PROTEGIDAS                  ==
 // ===============================================
-
-// Obtener eventos del usuario autenticado
-// GET /api/events/my-events
-router.get('/events/my-events', authenticateToken, getMyEvents);
 
 // Crear un nuevo evento (requiere ser OWNER o ADMIN)
 // POST /api/events
