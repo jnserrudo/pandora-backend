@@ -1,4 +1,4 @@
-import { TransactionalEmailsApi, SendSmtpEmail, TransactionalEmailsApiApiKeys } from '@getbrevo/brevo';
+import { TransactionalEmailsApi, SendSmtpEmail } from '@getbrevo/brevo';
 import dotenv from 'dotenv';
 import validator from 'validator';
 import { generateVerificationEmailTemplate } from '../utils/emails/VerificationEmail.js';
@@ -14,7 +14,8 @@ const fromName = process.env.FROM_NAME || 'Pandora';
 let apiInstance = null;
 if (brevoApiKey) {
     apiInstance = new TransactionalEmailsApi();
-    apiInstance.setApiKey(TransactionalEmailsApiApiKeys.apiKey, brevoApiKey);
+    // Autenticación según documentación de Brevo
+    apiInstance.authentications.apiKey.apiKey = brevoApiKey;
     console.log('✅ Servicio de email (Brevo) inicializado');
 } else {
     console.error('⚠️  BREVO_API_KEY no configurada. El envío de emails no funcionará.');
