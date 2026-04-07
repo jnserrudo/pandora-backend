@@ -1,4 +1,3 @@
-import { TransactionalEmailsApi, SendSmtpEmail } from '@getbrevo/brevo';
 import dotenv from 'dotenv';
 import validator from 'validator';
 import { generateVerificationEmailTemplate } from '../utils/emails/VerificationEmail.js';
@@ -10,12 +9,7 @@ const brevoApiKey = process.env.BREVO_API_KEY;
 const fromEmail = process.env.FROM_EMAIL || 'noreply@pandora-app.com.ar';
 const fromName = process.env.FROM_NAME || 'Pandora';
 
-// Inicializar cliente Brevo
-let apiInstance = null;
 if (brevoApiKey) {
-    apiInstance = new TransactionalEmailsApi();
-    // Autenticación según documentación de Brevo
-    apiInstance.authentications.apiKey.apiKey = brevoApiKey;
     console.log('✅ Servicio de email (Brevo) inicializado');
 } else {
     console.error('⚠️  BREVO_API_KEY no configurada. El envío de emails no funcionará.');
@@ -37,7 +31,7 @@ export const sendEmail = async (to, subject, text, html) => {
             throw new Error('La dirección de correo electrónico no es válida');
         }
 
-        if (!brevoApiKey || !apiInstance) {
+        if (!brevoApiKey) {
             console.error(`[EMAIL] ❌ BREVO_API_KEY no configurada`);
             throw new EmailAuthError(
                 'Servicio de email no configurado. Contactá al soporte.',
@@ -52,40 +46,47 @@ export const sendEmail = async (to, subject, text, html) => {
             service: 'Brevo'
         });
 
-        const sendSmtpEmail = new SendSmtpEmail();
-        sendSmtpEmail.to = [{ email: to }];
-        sendSmtpEmail.sender = { name: fromName, email: fromEmail };
-        sendSmtpEmail.subject = subject;
-        if (text) sendSmtpEmail.textContent = text;
-        if (html) sendSmtpEmail.htmlContent = html;
+        const emailPayload = {
+            to: [{ email: to }],
+            sender: { name: fromName, email: fromEmail },
+            subject: subject,
+            textContent: text || undefined,
+            htmlContent: html || undefined
+        };
 
-        console.log(`[EMAIL] Enviando correo via Brevo...`);
+        console.log(`[EMAIL] Enviando correo via Brevo API...`);
         
-        const response = await apiInstance.sendTransacEmail(sendSmtpEmail);
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': brevoApiKey,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify(emailPayload)
+        });
+
         const duration = Date.now() - startTime;
         
-        console.log(`[EMAIL] ✅ Correo enviado exitosamente en ${duration}ms`);
-        console.log(`[EMAIL] MessageId: ${response.messageId}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({
+                message: `HTTP ${response.status}: ${response.statusText}`
+            }));
+            console.error(`[EMAIL] ❌ Error HTTP ${response.status}:`, errorData);
+            throw new EmailSendError(
+                errorData.message || `Error ${response.status} al enviar email`,
+                { code: response.status, brevoError: errorData }
+            );
+        }
         
-        return { success: true, messageId: response.messageId };
+        const data = await response.json();
+        console.log(`[EMAIL] ✅ Correo enviado exitosamente en ${duration}ms`);
+        console.log(`[EMAIL] MessageId: ${data.messageId}`);
+        
+        return { success: true, messageId: data.messageId };
     } catch (error) {
         const duration = Date.now() - startTime;
         console.error(`[EMAIL] ❌ Error después de ${duration}ms`);
-        
-        // Brevo errors tienen la forma error.response.text o error.body
-        let brevoError = null;
-        if (error.response) {
-            try {
-                brevoError = JSON.parse(error.response.text);
-            } catch (e) {
-                brevoError = { message: error.response.text };
-            }
-        }
-        
-        if (brevoError) {
-            console.error(`[EMAIL] Brevo Error:`, brevoError);
-        }
-        
         console.error(`[EMAIL] Mensaje de error: ${error.message}`);
         
         if (error.stack) {
@@ -93,10 +94,9 @@ export const sendEmail = async (to, subject, text, html) => {
         }
         
         // Detectar errores específicos de Brevo
-        const errorCode = brevoError?.code || error.status;
-        const errorMessage = brevoError?.message || error.message;
+        const errorMessage = error.message || '';
         
-        if (errorCode === 'unauthorized' || error.status === 401 || errorMessage?.includes('API key')) {
+        if (error.code === 'unauthorized' || error.status === 401 || errorMessage?.includes('API key')) {
             console.error(`[EMAIL] 🔐 Error de API Key`);
             throw new EmailAuthError(
                 'Error de configuración del servicio de email.',
@@ -104,7 +104,7 @@ export const sendEmail = async (to, subject, text, html) => {
             );
         }
         
-        if (errorCode === 'rate_limit' || error.status === 429 || errorMessage?.includes('rate limit')) {
+        if (error.code === 'rate_limit' || error.status === 429 || errorMessage?.includes('rate limit')) {
             console.error(`[EMAIL] ⏱️  Rate limit alcanzado`);
             throw new EmailTimeoutError(
                 'Demasiados emails enviados. Por favor, intentá más tarde.',
@@ -121,8 +121,8 @@ export const sendEmail = async (to, subject, text, html) => {
         
         console.error(`[EMAIL] ❌ Error genérico de envío`);
         throw new EmailSendError(
-            brevoError?.message || error.message || 'Error al enviar el correo electrónico',
-            { originalError: error.message, code: errorCode, brevoError }
+            error.message || 'Error al enviar el correo electrónico',
+            { originalError: error.message, code: error.code || 'UNKNOWN' }
         );
     } finally {
         console.log(`[EMAIL] ==========================================`);
