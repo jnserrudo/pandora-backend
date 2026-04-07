@@ -1,54 +1,34 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import validator from 'validator';
 import { generateVerificationEmailTemplate } from '../utils/emails/VerificationEmail.js';
 
 dotenv.config();
 
-// Configuración de las credenciales de Gmail
-const userGmail = 'jnserrudo@gmail.com'; 
-const passAppGmail = process.env.GMAIL_PASS;
+// Configuración de Resend
+const resendApiKey = process.env.RESEND_API_KEY;
+// Usar dominio de prueba de Resend si no hay dominio propio configurado
+const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+const fromName = process.env.FROM_NAME || 'Pandora';
 
-// Configuración del transporter de Nodemailer con timeouts explícitos
-// Usando puerto 587 con TLS (más compatible con entornos cloud que 465)
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // TLS en puerto 587
-  requireTLS: true, // Forzar TLS
-  auth: {
-    user: userGmail,
-    pass: passAppGmail,
-  },
-  // Timeouts para evitar conexiones colgadas en entornos cloud
-  connectionTimeout: 15000, // 15 segundos para establecer conexión
-  greetingTimeout: 10000,     // 10 segundos para recibir greeting del servidor
-  socketTimeout: 15000,       // 15 segundos de inactividad
-  // Pool de conexiones para reutilizar
-  pool: true,
-  maxConnections: 2,
-  maxMessages: 50,
-  // Configuración TLS adicional
-  tls: {
-    rejectUnauthorized: false, // Permitir certificados self-signed si es necesario
-    minVersion: 'TLSv1.2'
-  }
-});
-
-// Verificar configuración al iniciar
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('⚠️  Error verificando configuración de email:', error.message);
-  } else {
-    console.log('✅ Servidor de email listo para enviar mensajes');
-  }
-});
+let resend;
+try {
+    if (resendApiKey) {
+        resend = new Resend(resendApiKey);
+        console.log('✅ Servicio de email (Resend) inicializado');
+    } else {
+        console.error('⚠️  RESEND_API_KEY no configurada. El envío de emails no funcionará.');
+    }
+} catch (error) {
+    console.error('⚠️  Error inicializando Resend:', error.message);
+}
 
 /**
- * Función genérica para envío de correos con validación y manejo de timeouts
+ * Función genérica para envío de correos usando Resend
  */
 export const sendEmail = async (to, subject, text, html) => {
     const startTime = Date.now();
+    console.log(`[EMAIL] ==========================================`);
     console.log(`[EMAIL] Iniciando envío de correo a: ${to}`);
     console.log(`[EMAIL] Asunto: ${subject}`);
     console.log(`[EMAIL] Timestamp: ${new Date().toISOString()}`);
@@ -59,76 +39,86 @@ export const sendEmail = async (to, subject, text, html) => {
             throw new Error('La dirección de correo electrónico no es válida');
         }
 
+        if (!resendApiKey) {
+            console.error(`[EMAIL] ❌ RESEND_API_KEY no configurada`);
+            throw new EmailAuthError(
+                'Servicio de email no configurado. Contactá al soporte.',
+                { code: 'MISSING_API_KEY' }
+            );
+        }
+
         console.log(`[EMAIL] ✅ Email validado: ${to}`);
-        console.log(`[EMAIL] Configuración del transporter:`, {
-            host: transporter.options.host,
-            port: transporter.options.port,
-            secure: transporter.options.secure,
-            requireTLS: transporter.options.requireTLS
+        console.log(`[EMAIL] Configuración:`, {
+            from: `${fromName} <${fromEmail}>`,
+            to: to,
+            service: 'Resend'
         });
 
-        const mailOptions = {
-            from: `"Pandora" <${userGmail}>`,
-            to,
+        console.log(`[EMAIL] Enviando correo via Resend...`);
+        
+        const { data, error } = await resend.emails.send({
+            from: `${fromName} <${fromEmail}>`,
+            to: [to],
             subject,
-            text,
-            html,
-        };
+            text: text || undefined,
+            html: html || undefined,
+        });
 
-        console.log(`[EMAIL] Enviando correo...`);
-        const info = await transporter.sendMail(mailOptions);
         const duration = Date.now() - startTime;
         
-        console.log(`[EMAIL] ✅ Correo enviado exitosamente en ${duration}ms`);
-        console.log(`[EMAIL] MessageId: ${info.messageId}`);
-        console.log(`[EMAIL] Response: ${info.response}`);
-        console.log(`[EMAIL] Accepted: ${info.accepted}`);
-        console.log(`[EMAIL] Rejected: ${info.rejected}`);
-        
-        if (info.rejected.length > 0) {
-            console.error(`[EMAIL] ⚠️  Algunos destinatarios fueron rechazados:`, info.rejected);
-            throw new Error('Se rechazó el envío a uno o más destinatarios');
+        if (error) {
+            console.error(`[EMAIL] ❌ Error de Resend:`, error);
+            throw new EmailSendError(
+                error.message || 'Error al enviar el correo',
+                { code: error.name, details: error }
+            );
         }
         
-        return { success: true, messageId: info.messageId, response: info.response };
+        console.log(`[EMAIL] ✅ Correo enviado exitosamente en ${duration}ms`);
+        console.log(`[EMAIL] ID: ${data.id}`);
+        
+        return { success: true, messageId: data.id };
     } catch (error) {
         const duration = Date.now() - startTime;
         console.error(`[EMAIL] ❌ Error después de ${duration}ms`);
         console.error(`[EMAIL] Código de error: ${error.code || 'N/A'}`);
         console.error(`[EMAIL] Mensaje de error: ${error.message}`);
-        console.error(`[EMAIL] Stack trace:`, error.stack);
         
-        // Detectar si es un error de timeout
-        const isTimeout = error.code === 'ETIMEDOUT' || 
-                         error.code === 'ECONNRESET' || 
-                         error.code === 'ECONNREFUSED' ||
-                         error.message?.includes('timeout') ||
-                         error.message?.includes('Connection timeout');
+        if (error.stack) {
+            console.error(`[EMAIL] Stack:`, error.stack);
+        }
         
-        if (isTimeout) {
-            console.error(`[EMAIL] ⏱️  TIMEOUT detectado enviando a ${to}`);
-            console.error(`[EMAIL] El servidor SMTP no respondió a tiempo`);
-            throw new EmailTimeoutError(
-                'No se pudo conectar al servidor de correo. Por favor, intentá reenviar el código en unos momentos.',
-                { originalError: error.message, recipient: to, code: error.code }
+        // Detectar errores específicos de Resend
+        if (error.message?.includes('API key')) {
+            console.error(`[EMAIL] 🔐 Error de API Key`);
+            throw new EmailAuthError(
+                'Error de configuración del servicio de email.',
+                { originalError: error.message, code: 'INVALID_API_KEY' }
             );
         }
         
-        // Error de autenticación
-        if (error.code === 'EAUTH' || error.message?.includes('Invalid login')) {
-            console.error(`[EMAIL] 🔐 Error de autenticación SMTP`);
-            console.error(`[EMAIL] Verificar GMAIL_PASS en variables de entorno`);
-            throw new EmailAuthError(
-                'Error de configuración del servidor de correo. Contactá al soporte.',
-                { originalError: error.message, code: error.code }
+        if (error.message?.includes('rate limit')) {
+            console.error(`[EMAIL] ⏱️  Rate limit alcanzado`);
+            throw new EmailTimeoutError(
+                'Demasiados emails enviados. Por favor, intentá más tarde.',
+                { originalError: error.message, code: 'RATE_LIMIT' }
             );
+        }
+        
+        // Re-lanzar errores ya categorizados
+        if (error instanceof EmailTimeoutError || 
+            error instanceof EmailAuthError || 
+            error instanceof EmailSendError) {
+            throw error;
         }
         
         console.error(`[EMAIL] ❌ Error genérico de envío`);
         throw new EmailSendError(
             error.message || 'Error al enviar el correo electrónico',
-            { originalError: error.message, code: error.code }
+            { originalError: error.message, code: error.code || 'UNKNOWN' }
         );
+    } finally {
+        console.log(`[EMAIL] ==========================================`);
     }
 };
 
@@ -206,7 +196,7 @@ export const notifyCommerceStatusUpdate = async (email, commerceName, status, re
  * Notifica al administrador sobre un nuevo envío pendiente
  */
 export const notifyNewCommerceSubmission = async (commerce) => {
-    const adminEmail = process.env.ADMIN_EMAIL || userGmail;
+    const adminEmail = process.env.ADMIN_EMAIL || fromEmail;
     const subject = `🔔 Nueva solicitud pendiente: ${commerce.name}`;
     const html = `
         <h3>Nueva solicitud de alta</h3>
