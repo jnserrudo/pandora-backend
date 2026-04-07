@@ -9,23 +9,63 @@ dotenv.config();
 const userGmail = 'jnserrudo@gmail.com'; 
 const passAppGmail = process.env.GMAIL_PASS;
 
-// Configuración del transporter de Nodemailer
+// Configuración del transporter de Nodemailer con timeouts explícitos
+// Usando puerto 587 con TLS (más compatible con entornos cloud que 465)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // TLS en puerto 587
+  requireTLS: true, // Forzar TLS
   auth: {
     user: userGmail,
     pass: passAppGmail,
   },
+  // Timeouts para evitar conexiones colgadas en entornos cloud
+  connectionTimeout: 15000, // 15 segundos para establecer conexión
+  greetingTimeout: 10000,     // 10 segundos para recibir greeting del servidor
+  socketTimeout: 15000,       // 15 segundos de inactividad
+  // Pool de conexiones para reutilizar
+  pool: true,
+  maxConnections: 2,
+  maxMessages: 50,
+  // Configuración TLS adicional
+  tls: {
+    rejectUnauthorized: false, // Permitir certificados self-signed si es necesario
+    minVersion: 'TLSv1.2'
+  }
+});
+
+// Verificar configuración al iniciar
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('⚠️  Error verificando configuración de email:', error.message);
+  } else {
+    console.log('✅ Servidor de email listo para enviar mensajes');
+  }
 });
 
 /**
- * Función genérica para envío de correos con validación
+ * Función genérica para envío de correos con validación y manejo de timeouts
  */
 export const sendEmail = async (to, subject, text, html) => {
+    const startTime = Date.now();
+    console.log(`[EMAIL] Iniciando envío de correo a: ${to}`);
+    console.log(`[EMAIL] Asunto: ${subject}`);
+    console.log(`[EMAIL] Timestamp: ${new Date().toISOString()}`);
+    
     try {
         if (!to || !validator.isEmail(to)) {
+            console.error(`[EMAIL] ❌ Email inválido: ${to}`);
             throw new Error('La dirección de correo electrónico no es válida');
         }
+
+        console.log(`[EMAIL] ✅ Email validado: ${to}`);
+        console.log(`[EMAIL] Configuración del transporter:`, {
+            host: transporter.options.host,
+            port: transporter.options.port,
+            secure: transporter.options.secure,
+            requireTLS: transporter.options.requireTLS
+        });
 
         const mailOptions = {
             from: `"Pandora" <${userGmail}>`,
@@ -35,19 +75,90 @@ export const sendEmail = async (to, subject, text, html) => {
             html,
         };
 
+        console.log(`[EMAIL] Enviando correo...`);
         const info = await transporter.sendMail(mailOptions);
-        console.log('Correo enviado:', info.messageId);
+        const duration = Date.now() - startTime;
+        
+        console.log(`[EMAIL] ✅ Correo enviado exitosamente en ${duration}ms`);
+        console.log(`[EMAIL] MessageId: ${info.messageId}`);
+        console.log(`[EMAIL] Response: ${info.response}`);
+        console.log(`[EMAIL] Accepted: ${info.accepted}`);
+        console.log(`[EMAIL] Rejected: ${info.rejected}`);
         
         if (info.rejected.length > 0) {
+            console.error(`[EMAIL] ⚠️  Algunos destinatarios fueron rechazados:`, info.rejected);
             throw new Error('Se rechazó el envío a uno o más destinatarios');
         }
         
-        return info;
+        return { success: true, messageId: info.messageId, response: info.response };
     } catch (error) {
-        console.error('Error enviando correo:', error);
-        throw error;
+        const duration = Date.now() - startTime;
+        console.error(`[EMAIL] ❌ Error después de ${duration}ms`);
+        console.error(`[EMAIL] Código de error: ${error.code || 'N/A'}`);
+        console.error(`[EMAIL] Mensaje de error: ${error.message}`);
+        console.error(`[EMAIL] Stack trace:`, error.stack);
+        
+        // Detectar si es un error de timeout
+        const isTimeout = error.code === 'ETIMEDOUT' || 
+                         error.code === 'ECONNRESET' || 
+                         error.code === 'ECONNREFUSED' ||
+                         error.message?.includes('timeout') ||
+                         error.message?.includes('Connection timeout');
+        
+        if (isTimeout) {
+            console.error(`[EMAIL] ⏱️  TIMEOUT detectado enviando a ${to}`);
+            console.error(`[EMAIL] El servidor SMTP no respondió a tiempo`);
+            throw new EmailTimeoutError(
+                'No se pudo conectar al servidor de correo. Por favor, intentá reenviar el código en unos momentos.',
+                { originalError: error.message, recipient: to, code: error.code }
+            );
+        }
+        
+        // Error de autenticación
+        if (error.code === 'EAUTH' || error.message?.includes('Invalid login')) {
+            console.error(`[EMAIL] 🔐 Error de autenticación SMTP`);
+            console.error(`[EMAIL] Verificar GMAIL_PASS en variables de entorno`);
+            throw new EmailAuthError(
+                'Error de configuración del servidor de correo. Contactá al soporte.',
+                { originalError: error.message, code: error.code }
+            );
+        }
+        
+        console.error(`[EMAIL] ❌ Error genérico de envío`);
+        throw new EmailSendError(
+            error.message || 'Error al enviar el correo electrónico',
+            { originalError: error.message, code: error.code }
+        );
     }
 };
+
+// Clases de error personalizadas para manejo específico
+export class EmailTimeoutError extends Error {
+    constructor(message, details = {}) {
+        super(message);
+        this.name = 'EmailTimeoutError';
+        this.code = 'EMAIL_TIMEOUT';
+        this.details = details;
+    }
+}
+
+export class EmailAuthError extends Error {
+    constructor(message, details = {}) {
+        super(message);
+        this.name = 'EmailAuthError';
+        this.code = 'EMAIL_AUTH';
+        this.details = details;
+    }
+}
+
+export class EmailSendError extends Error {
+    constructor(message, details = {}) {
+        super(message);
+        this.name = 'EmailSendError';
+        this.code = 'EMAIL_SEND';
+        this.details = details;
+    }
+}
 
 /**
  * Notificación cuando un comercio cambia de estado (Aprobado/Rechazado)

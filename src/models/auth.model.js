@@ -185,3 +185,36 @@ export const verifyOTPService = async (email, otp) => {
   await prisma.verificationToken.deleteMany({ where: { userId: user.id } });
   return { success: true };
 };
+
+/**
+ * Genera un nuevo OTP y lo guarda para reenvío
+ */
+export const resendOTPService = async (email) => {
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findFirst({ where: { email: normalizedEmail } });
+  
+  if (!user) {
+    throwError("Usuario no encontrado", 404);
+  }
+
+  // Verificar si el usuario ya está verificado
+  if (user.isVerified) {
+    throwError("La cuenta ya está verificada", 400);
+  }
+
+  // Limpiar tokens anteriores del usuario
+  await prisma.verificationToken.deleteMany({ where: { userId: user.id } });
+
+  // Generar nuevo OTP
+  const otpCode = generateOTP();
+  await prisma.verificationToken.create({
+    data: {
+      userId: user.id,
+      token: otpCode,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15 minutos
+    }
+  });
+
+  const { password: _, ...userWithoutPassword } = user;
+  return { user: userWithoutPassword, otpCode };
+};
