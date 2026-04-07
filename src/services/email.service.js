@@ -6,7 +6,9 @@ dotenv.config();
 
 // Configuración de Brevo
 const brevoApiKey = process.env.BREVO_API_KEY;
-const fromEmail = process.env.FROM_EMAIL || 'noreply@pandora-app.com.ar';
+// Usar email de Brevo como remitente (o el configurado)
+// Nota: Brevo requiere que el remitente esté validado en la cuenta
+const fromEmail = process.env.FROM_EMAIL || 'jnserrudo@gmail.com';
 const fromName = process.env.FROM_NAME || 'Pandora';
 
 if (brevoApiKey) {
