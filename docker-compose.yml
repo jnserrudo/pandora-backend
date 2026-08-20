@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: pandora_dev
+      MYSQL_USER: pandora
+      MYSQL_PASSWORD: pandora_dev
+      MYSQL_ROOT_PASSWORD: pandora_root_dev
+    volumes:
+      - pandora_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-ppandora_root_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pandora_mysql_data:

@@ -6,16 +6,26 @@ export const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1]; // Extract token from "Bearer TOKEN"
 
   if (!token) {
-    return res.status(401).json({ message: 'Access Token required.' });
+    return res.status(401).json({ message: 'Se requiere el Access Token.' });
   }
 
-  const decoded = verifyAccessToken(token);
+  const result = verifyAccessToken(token);
 
-  if (!decoded) {
-    return res.status(401).json({ message: 'Invalid or expired Access Token.' });
+  if (!result.valid) {
+    const message = result.expired
+      ? 'El Access Token ha expirado.'
+      : 'El Access Token no es válido.';
+    return res.status(401).json({ message });
   }
 
-  req.user = decoded; // Attach user information to the request object
-  next(); // Proceed to the next middleware/controller
+  req.user = result.payload;
+  next();
+};
+
+/** Si hay Bearer, autentica; si no, sigue como anónimo. */
+export const optionalAuthenticate = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return next();
+  return authenticateToken(req, res, next);
 };
 

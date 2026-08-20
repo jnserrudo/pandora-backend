@@ -1,4 +1,6 @@
 import prisma from '../db/prismaClient.js';
+import { throwError } from '../utils/error.utils.js';
+import { moderateContent, attachModerationResource } from '../services/moderation.service.js';
 
 // ==================== COMENTARIOS ====================
 
@@ -6,6 +8,12 @@ import prisma from '../db/prismaClient.js';
  * Crear un comentario sobre un comercio
  */
 export const createCommentModel = async (data) => {
+  const moderationResult = await moderateContent(
+    `${data.userName || ''}\n${data.comment || ''}`,
+    'COMMENT',
+    null
+  );
+
   const comment = await prisma.commerceComment.create({
     data,
     include: {
@@ -14,6 +22,7 @@ export const createCommentModel = async (data) => {
       }
     }
   });
+  await attachModerationResource(moderationResult.logId, comment.id);
 
   //  Actualizar métricas del comercio
   await updateCommerceMetrics(data.commerceId);
@@ -63,8 +72,17 @@ export const updateCommentModel = async (id, data) => {
  * Respuesta del comercio a un comentario
  */
 export const replyCommentModel = async (id, replyText) => {
+  const commentId = parseInt(id);
+  await moderateContent(
+    String(replyText || ''),
+    'COMMENT',
+    commentId,
+    [],
+    { fieldsAnalyzed: ['commerceReply'] }
+  );
+
   return await prisma.commerceComment.update({
-    where: { id: parseInt(id) },
+    where: { id: commentId },
     data: {
       commerceReply: replyText
     }

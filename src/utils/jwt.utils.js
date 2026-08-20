@@ -12,16 +12,24 @@ export const generateRefreshToken = (payload) => {
 
 export const verifyAccessToken = (token) => {
   try {
-    return jwt.verify(token, jwtConfig.jwtSecret);
+    const payload = jwt.verify(token, jwtConfig.jwtSecret);
+    return { valid: true, expired: false, payload };
   } catch (error) {
-    return null; // Token is invalid or expired
+    if (error.name === 'TokenExpiredError') {
+      return { valid: false, expired: true, error };
+    }
+    return { valid: false, expired: false, error };
   }
 };
 
 export const verifyRefreshToken = (token) => {
   try {
-    return jwt.verify(token, jwtConfig.refreshTokenSecret);
+    const payload = jwt.verify(token, jwtConfig.refreshTokenSecret);
+    return { valid: true, expired: false, payload };
   } catch (error) {
-    return null; // Token is invalid or expired
+    if (error.name === 'TokenExpiredError') {
+      return { valid: false, expired: true, error };
+    }
+    return { valid: false, expired: false, error };
   }
 };

@@ -4,7 +4,8 @@ import {
     updateMyProfile,
     getAllUsers,
     getUserById,
-    getUserContent
+    getUserContent,
+    adminUpdateUser
 } from '../controllers/user.controller.js';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 import { authorizeRole } from '../middlewares/authorize.middleware.js';
@@ -22,6 +23,7 @@ router.get('/users/me', authenticateToken, getMyProfile);
 // Actualizar el perfil del usuario logueado
 // PUT /api/users/me
 router.put('/users/me', authenticateToken, updateMyProfile);
+router.patch('/users/me', authenticateToken, updateMyProfile);
 
 // ===============================================
 // ==     RUTAS DE ADMINISTRACIÓN (ADMIN)       ==
@@ -34,6 +36,10 @@ router.get('/users', authenticateToken, authorizeRole(['ADMIN']), getAllUsers);
 // Obtener contenido de un usuario (eventos, comercios) (DEBE IR ANTES DE /users/:id)
 // GET /api/users/:id/content
 router.get('/users/:id/content', authenticateToken, authorizeRole(['ADMIN']), getUserContent);
+
+// Actualizar rol / estado (ADMIN)
+// PATCH /api/users/:id
+router.patch('/users/:id', authenticateToken, authorizeRole(['ADMIN']), adminUpdateUser);
 
 // Obtener un usuario por ID (DEBE IR AL FINAL)
 // GET /api/users/:id

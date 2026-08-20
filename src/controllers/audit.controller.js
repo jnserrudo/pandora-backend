@@ -35,7 +35,7 @@ export const getAuditLogs = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("Error fetching audit logs:", error);
+        console.error('[AUDIT] Error obteniendo logs de auditoría:', error.message);
         res.status(500).json({ message: "Error interno al recuperar los logs de auditoría" });
     }
 };

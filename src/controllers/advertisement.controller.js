@@ -9,7 +9,7 @@ export const getAdvertisements = async (req, res) => {
         const advertisements = await advertisementModel.getAllAdvertisementsModel(req.query, adminMode);
         res.status(200).json(advertisements);
     } catch (error) {
-        console.error("Error in getAdvertisements controller:", error);
+        console.error('[ADVERTISEMENT] Error obteniendo publicidades:', error.message);
         // Fallback to empty array instead of 500 for better UX in public site
         res.status(200).json([]);
     }

@@ -1,6 +1,7 @@
 import prisma from '../db/prismaClient.js';
 import { throwError } from '../utils/error.utils.js';
 import slugify from 'slugify';
+import { moderateContent, attachModerationResource, collectImageUrls } from '../services/moderation.service.js';
 
 // --- FUNCIONES PÚBLICAS (PARA CONSUMIDORES) ---
 
@@ -53,9 +54,30 @@ export const getArticleBySlugModel = async (slug) => {
     });
     // Un usuario público solo puede ver artículos publicados y que no estén eliminados lógicamente.
     if (!article || article.status !== 'PUBLISHED' || !article.isActive) {
-        throwError('Article not found or is not published.', 404);
+        throwError('Artículo no encontrado o no publicado.', 404);
     }
-    return article;
+
+    const related = await prisma.article.findMany({
+        where: {
+            status: 'PUBLISHED',
+            isActive: true,
+            id: { not: article.id },
+        },
+        select: {
+            id: true,
+            slug: true,
+            title: true,
+            subtitle: true,
+            coverImage: true,
+            authorName: true,
+            createdAt: true,
+            category: { select: { name: true, slug: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+    });
+
+    return { ...article, related };
 };
 
 // --- FUNCIONES PROTEGIDAS (PARA ADMINS) ---
@@ -68,7 +90,7 @@ export const getArticleBySlugModel = async (slug) => {
 export const createArticleModel = async (data) => {
     const { title, ...articleData } = data;
     if (!title) {
-        throwError('Title is required to create an article.', 400);
+        throwError('El título es requerido para crear un artículo.', 400);
     }
     
     // Generamos un slug único a partir del título.
@@ -77,16 +99,25 @@ export const createArticleModel = async (data) => {
     // Verificamos si ya existe un artículo con ese slug
     const existingArticle = await prisma.article.findUnique({ where: { slug } });
     if (existingArticle) {
-        throwError('An article with this title already exists, resulting in a duplicate slug.', 409);
+        throwError('Ya existe un artículo con este título (slug duplicado).', 409);
     }
 
-    return prisma.article.create({
+    const moderationResult = await moderateContent(
+        `${title}\n${articleData.subtitle || ''}\n${articleData.content || ''}`,
+        'ARTICLE',
+        null,
+        collectImageUrls(articleData)
+    );
+
+    const created = await prisma.article.create({
         data: {
             title,
             slug,
             ...articleData,
         },
     });
+    await attachModerationResource(moderationResult.logId, created.id);
+    return created;
 };
 
 /**
@@ -101,16 +132,27 @@ export const updateArticleModel = async (id, data) => {
         if (data.title) {
             data.slug = slugify(data.title, { lower: true, strict: true });
         }
+        const textToAnalyze = `${data.title || ''}\n${data.subtitle || ''}\n${data.content || ''}`.trim();
+        const images = collectImageUrls(data);
+        if (textToAnalyze || images.length) {
+            await moderateContent(
+                textToAnalyze || '(solo imágenes)',
+                'ARTICLE',
+                parseInt(id),
+                images,
+                { fieldsAnalyzed: ['title', 'subtitle', 'content', 'imágenes'] }
+            );
+        }
         return await prisma.article.update({
             where: { id: parseInt(id) },
             data,
         });
     } catch (error) {
         if (error.code === 'P2025') { // "Registro no encontrado"
-            throwError('Article not found.', 404);
+            throwError('Artículo no encontrado.', 404);
         }
         if (error.code === 'P2002') { // "Constraint único falló" (slug duplicado)
-            throwError('The updated title creates a duplicate slug.', 409);
+            throwError('El título actualizado genera un slug duplicado.', 409);
         }
         throw error;
     }
@@ -128,7 +170,7 @@ export const deleteArticleModel = async (id) => {
         });
     } catch (error) {
         if (error.code === 'P2025') {
-            throwError('Article not found.', 404);
+            throwError('Artículo no encontrado.', 404);
         }
         throw error;
     }
@@ -173,13 +215,13 @@ export const getArticleByIdForAdminModel = async (id) => {
  */
 export const createCategoryModel = async (data) => {
     const { name } = data;
-    if (!name) throwError('Category name is required.', 400);
+    if (!name) throwError('El nombre de la categoría es requerido.', 400);
 
     const slug = slugify(name, { lower: true, strict: true });
     const existingCategory = await prisma.articleCategory.findFirst({
         where: { OR: [{ name }, { slug }] }
     });
-    if (existingCategory) throwError('A category with this name or slug already exists.', 409);
+    if (existingCategory) throwError('Ya existe una categoría con este nombre o slug.', 409);
 
     return prisma.articleCategory.create({ data: { name, slug } });
 };
@@ -199,7 +241,7 @@ export const updateCategoryModel = async (id, data) => {
             data,
         });
     } catch (error) {
-        if (error.code === 'P2025') throwError('Category not found.', 404);
+        if (error.code === 'P2025') throwError('Categoría no encontrada.', 404);
         throw error;
     }
 };

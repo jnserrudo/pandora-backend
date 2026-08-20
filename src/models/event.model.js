@@ -1,5 +1,6 @@
 import prisma from '../db/prismaClient.js';
 import { throwError } from '../utils/error.utils.js';
+import { moderateContent, attachModerationResource, collectImageUrls } from '../services/moderation.service.js';
 
 // --- FUNCIONES PÚBLICAS (PARA CONSUMIDORES) ---
 
@@ -9,12 +10,18 @@ import { throwError } from '../utils/error.utils.js';
  * @returns {Promise<Array>} Lista de eventos.
  */
 export const getAllEventsModel = async (filters = {}) => {
-    const { category, commerceId, startDate, endDate } = filters;
-    
+    const { category, commerceId, startDate, endDate, page = 1, limit = 50, includeAll = false } = filters;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
     return prisma.event.findMany({
-        where: { 
-            status: 'SCHEDULED',
-            isActive: true,
+        where: {
+            ...(includeAll
+                ? {}
+                : {
+                    status: 'SCHEDULED',
+                    isActive: true,
+                    NOT: { paymentStatus: 'REJECTED' },
+                }),
             ...(category && { category }),
             ...(commerceId && { commerceId: parseInt(commerceId) }),
             ...(startDate && endDate && {
@@ -24,6 +31,8 @@ export const getAllEventsModel = async (filters = {}) => {
                 }
             })
         },
+        skip,
+        take: parseInt(limit),
         orderBy: { startDate: 'asc' },
         include: {
             commerce: {
@@ -41,15 +50,27 @@ export const getAllEventsModel = async (filters = {}) => {
  * @param {number} id - El ID del evento.
  * @returns {Promise<Object>} El objeto del evento.
  */
-export const getEventByIdModel = async (id) => {
+export const getEventByIdModel = async (id, viewer = null) => {
     const event = await prisma.event.findUnique({
         where: { id: parseInt(id) },
         include: {
-            commerce: true, // Incluimos todos los datos del comercio
+            commerce: true,
         },
     });
-    if (!event || event.status !== 'SCHEDULED' || !event.isActive) {
-        throwError('Event not found or is not active.', 404);
+    if (!event) {
+        throwError('Evento no encontrado o no está activo.', 404);
+    }
+
+    const isPublic = event.status === 'SCHEDULED'
+        && event.isActive
+        && event.paymentStatus !== 'REJECTED';
+    const isPrivileged = viewer && (
+        viewer.role === 'ADMIN' ||
+        (event.commerce && Number(viewer.id) === Number(event.commerce.ownerId))
+    );
+
+    if (!isPublic && !isPrivileged) {
+        throwError('Evento no encontrado o no está activo.', 404);
     }
     return event;
 };
@@ -64,10 +85,10 @@ export const getEventByIdModel = async (id) => {
  * @returns {Promise<Object>} El nuevo evento creado.
  */
 export const createEventModel = async (data, ownerId, userRole) => {
-    const { commerceId, ...eventData } = data;
+    const { commerceId, status: _ignoredStatus, ...eventData } = data;
 
     if (!commerceId) {
-        throwError('commerceId is required to create an event.', 400);
+        throwError('El commerceId es requerido para crear un evento.', 400);
     }
     
     const commerce = await prisma.commerce.findUnique({
@@ -75,18 +96,28 @@ export const createEventModel = async (data, ownerId, userRole) => {
     });
 
     if (!commerce) {
-        throwError('Commerce not found.', 404);
+        throwError('Comercio no encontrado.', 404);
     }
     if (commerce.ownerId !== ownerId && userRole !== 'ADMIN') {
-        throwError('Forbidden: You are not the owner of this commerce.', 403);
+        throwError('Prohibido: no sos el dueño de este comercio.', 403);
     }
 
-    return prisma.event.create({
+    const moderationResult = await moderateContent(
+        `${eventData.name || ''}\n${eventData.description || ''}`,
+        'EVENT',
+        null,
+        collectImageUrls(eventData)
+    );
+
+    const created = await prisma.event.create({
         data: {
             ...eventData,
+            status: userRole === 'ADMIN' ? 'SCHEDULED' : 'PENDING',
             commerce: { connect: { id: parseInt(commerceId) } },
         },
     });
+    await attachModerationResource(moderationResult.logId, created.id);
+    return created;
 };
 
 /**
@@ -104,14 +135,21 @@ export const updateEventModel = async (eventId, data, ownerId, userRole) => {
     });
 
     if (!event) {
-        throwError('Event not found.', 404);
+        throwError('Evento no encontrado.', 404);
     }
     if (event.commerce.ownerId !== ownerId && userRole !== 'ADMIN') {
-        throwError('Forbidden: You do not have permission to update this event.', 403);
+        throwError('Prohibido: no tenés permiso para actualizar este evento.', 403);
     }
     
     // Excluimos campos que no deberían cambiar en una actualización simple
     const { id, commerceId, ...updateData } = data;
+
+    await moderateContent(
+        `${updateData.name || event.name}\n${updateData.description || event.description}`,
+        'EVENT',
+        event.id,
+        collectImageUrls({ ...event, ...updateData })
+    );
 
     return prisma.event.update({
         where: { id: parseInt(eventId) },
@@ -132,10 +170,10 @@ export const deleteEventModel = async (eventId, ownerId, userRole) => {
     });
 
     if (!event) {
-        throwError('Event not found.', 404);
+        throwError('Evento no encontrado.', 404);
     }
     if (event.commerce.ownerId !== ownerId && userRole !== 'ADMIN') {
-        throwError('Forbidden: You do not have permission to delete this event.', 403);
+        throwError('Prohibido: no tenés permiso para eliminar este evento.', 403);
     }
 
     await prisma.event.update({
@@ -160,9 +198,23 @@ export const updateEventStatusModel = async (id, isActive) => {
  * @param {string} paymentStatus - 'VALIDATED' o 'REJECTED'.
  * @returns {Promise<Object>} El evento actualizado.
  */
+export const approveEventModel = async (id) => {
+    return prisma.event.update({
+        where: { id: parseInt(id) },
+        data: { status: 'SCHEDULED', isActive: true }
+    });
+};
+
+export const rejectEventModel = async (id) => {
+    return prisma.event.update({
+        where: { id: parseInt(id) },
+        data: { status: 'REJECTED', isActive: false }
+    });
+};
+
 export const validateEventPaymentModel = async (id, paymentStatus) => {
     if (!['VALIDATED', 'REJECTED'].includes(paymentStatus)) {
-        throwError('Invalid payment status. Must be VALIDATED or REJECTED.', 400);
+        throwError('Estado de pago inválido. Debe ser VALIDATED o REJECTED.', 400);
     }
 
     const event = await prisma.event.findUnique({
@@ -170,16 +222,19 @@ export const validateEventPaymentModel = async (id, paymentStatus) => {
     });
 
     if (!event) {
-        throwError('Event not found.', 404);
+        throwError('Evento no encontrado.', 404);
     }
 
     if (event.eventTier === 1) {
-        throwError('Basic tier events do not require payment validation.', 400);
+        throwError('Los eventos de categoría básica no requieren validación de pago.', 400);
     }
 
     return prisma.event.update({
         where: { id: parseInt(id) },
-        data: { paymentStatus }
+        data: {
+            paymentStatus,
+            ...(paymentStatus === 'REJECTED' && { isActive: false }),
+        }
     });
 };
 

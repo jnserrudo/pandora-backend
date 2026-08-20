@@ -59,41 +59,63 @@ export const getCategoryStatsModel = async () => {
         'DEFAULT': '#ffbd39'
     };
 
+    const labelMap = {
+        'GASTRONOMIA': 'Gastronomía',
+        'VIDA_NOCTURNA': 'Vida Nocturna',
+        'SALAS_Y_TEATRO': 'Salas y Teatro'
+    };
+
     return categories.map(cat => ({
-        name: cat.category,
+        name: labelMap[cat.category] || (cat.category
+            ? String(cat.category).split('_').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')
+            : 'Sin categoría'),
         value: cat._count.id,
         color: colorMap[cat.category] || colorMap['DEFAULT']
     }));
 };
 
 /**
- * Obtiene actividad semanal (mockeada la distribución diaria por falta de logs históricos,
- * pero basada en totales reales para que sea funcional).
- * TODO: En v3 implementar tabla AnalyticsLog para tracking diario real.
+ * Actividad de los últimos 7 días: altas de usuarios + acciones de auditoría.
  */
 export const getWeeklyActivityModel = async () => {
     const days = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
-    const today = new Date().getDay();
-    
-    // Obtenemos totales de los últimos 7 días (simplificado)
-    const stats = await prisma.advertisement.aggregate({
-        _sum: { impressions: true, clicks: true }
-    });
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 6);
 
-    const totalVisitas = stats._sum.impressions || 0;
-    const totalClicks = stats._sum.clicks || 0;
+    const [users, audits] = await Promise.all([
+        prisma.user.findMany({
+            where: { createdAt: { gte: start } },
+            select: { createdAt: true },
+        }),
+        prisma.auditLog.findMany({
+            where: { createdAt: { gte: start } },
+            select: { createdAt: true },
+        }),
+    ]);
 
-    // Generamos una distribución "realista" basada en el total para el gráfico
-    return Array.from({ length: 7 }).map((_, i) => {
-        const dayIdx = (today - (6 - i) + 7) % 7;
-        // Distribuimos el total de forma irregular para que el gráfico no sea plano
-        const factor = 0.5 + Math.random(); 
-        return {
-            name: days[dayIdx],
-            visitas: Math.floor((totalVisitas / 7) * factor),
-            clicks: Math.floor((totalClicks / 7) * factor)
+    const bucket = {};
+    for (let i = 0; i < 7; i += 1) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const key = d.toISOString().slice(0, 10);
+        bucket[key] = {
+            name: days[d.getDay()],
+            altas: 0,
+            acciones: 0,
         };
+    }
+
+    users.forEach((row) => {
+        const key = new Date(row.createdAt).toISOString().slice(0, 10);
+        if (bucket[key]) bucket[key].altas += 1;
     });
+    audits.forEach((row) => {
+        const key = new Date(row.createdAt).toISOString().slice(0, 10);
+        if (bucket[key]) bucket[key].acciones += 1;
+    });
+
+    return Object.keys(bucket).sort().map((key) => bucket[key]);
 };
 
 /**

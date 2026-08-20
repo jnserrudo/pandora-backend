@@ -368,7 +368,7 @@ async function notifyAdminsNewComment(commerceId, comment) {
       });
     }
   } catch (error) {
-    console.error('Error notificando admins:', error);
+    console.error('[FEEDBACK] Error notificando admins:', error.message);
   }
 }
 
@@ -391,6 +391,6 @@ async function notifyCommerceOwnerAdvisory(commerceId, advisory) {
       }
     });
   } catch (error) {
-    console.error('Error notificando owner:', error);
+    console.error('[FEEDBACK] Error notificando owner:', error.message);
   }
 }

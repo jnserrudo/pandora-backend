@@ -15,7 +15,7 @@ import { getProductsByCommerceId, createProduct, deleteProduct } from '../contro
 import { getFAQsByCommerceId, createFAQ } from '../controllers/faq.controller.js';
 import { getBranchesByCommerceId, createBranch, deleteBranch } from '../controllers/branch.controller.js';
 import { subscribeNewsletter, getSubscriptions } from '../controllers/newsletter.controller.js';
-import { authenticateToken } from '../middlewares/auth.middleware.js';
+import { authenticateToken, optionalAuthenticate } from '../middlewares/auth.middleware.js';
 import { authorizeRole } from '../middlewares/authorize.middleware.js';
 
 const router = Router();
@@ -26,7 +26,7 @@ const router = Router();
 
 // Obtener lista de todos los comercios activos.
 // GET /api/commerces
-router.get('/commerces', getCommerces);
+router.get('/commerces', optionalAuthenticate, getCommerces);
 
 // ===============================================
 // ==           RUTAS PROTEGIDAS                ==
@@ -65,7 +65,7 @@ router.put('/commerces/:id/validate', authenticateToken, authorizeRole(['ADMIN']
 // Obtener un comercio específico por su ID.
 // Esta ruta es la más genérica y debe ir ÚLTIMA para que no intercepte a las demás.
 // GET /api/commerces/1
-router.get('/commerces/:id', getCommerceById);
+router.get('/commerces/:id', optionalAuthenticate, getCommerceById);
 
 // --- PRODUCTOS ---
 router.get('/commerces/:commerceId/products', getProductsByCommerceId);

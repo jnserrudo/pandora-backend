@@ -108,7 +108,6 @@ export const deleteArticle = async (req, res) => {
 export const getArticleCategories = async (req, res) => {
     try {
         const categories = await articleModel.getAllCategoriesModel();
-        console.log(categories);
         res.status(200).json(categories);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -128,7 +127,7 @@ export const getArticleForAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         const article = await articleModel.getArticleByIdForAdminModel(id);
-        if (!article) return res.status(404).json({ message: 'Article not found' });
+        if (!article) return res.status(404).json({ message: 'Artículo no encontrado' });
         res.status(200).json(article);
     } catch (error) {
         res.status(500).json({ message: error.message });

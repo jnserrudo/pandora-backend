@@ -13,7 +13,7 @@ export const getCategories = async (req, res) => {
         });
         res.status(200).json(categories);
     } catch (error) {
-        console.error("Error in getCategories:", error);
+        console.error('[CATEGORY] Error obteniendo categorías:', error.message);
         res.status(500).json({ message: "Error al obtener las categorías" });
     }
 };
@@ -44,7 +44,7 @@ export const createCategory = async (req, res) => {
 
         res.status(201).json(category);
     } catch (error) {
-        console.error("Error in createCategory:", error);
+        console.error('[CATEGORY] Error creando categoría:', error.message);
         const statusCode = error.statusCode || 500;
         const message = statusCode === 500 ? "Error al crear la categoría" : error.message;
         res.status(statusCode).json({ message });
@@ -78,7 +78,7 @@ export const updateCategory = async (req, res) => {
 
         res.status(200).json(category);
     } catch (error) {
-        console.error("Error in updateCategory:", error);
+        console.error('[CATEGORY] Error actualizando categoría:', error.message);
         const statusCode = error.statusCode || 500;
         const message = statusCode === 500 ? "Error al actualizar la categoría" : error.message;
         res.status(statusCode).json({ message });
@@ -109,7 +109,7 @@ export const deleteCategory = async (req, res) => {
 
         res.status(204).send();
     } catch (error) {
-        console.error("Error in deleteCategory:", error);
+        console.error('[CATEGORY] Error eliminando categoría:', error.message);
         res.status(500).json({ message: "Error al eliminar la categoría" });
     }
 };

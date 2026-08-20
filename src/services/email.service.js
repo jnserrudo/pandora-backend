@@ -4,6 +4,13 @@ import { generateVerificationEmailTemplate } from '../utils/emails/VerificationE
 
 dotenv.config();
 
+// Helper para ofuscar emails en logs
+const obfuscateEmail = (email) => {
+    if (!email || !email.includes('@')) return '[inválido]';
+    const [user, domain] = email.split('@');
+    return `${user.charAt(0)}***@${domain}`;
+};
+
 // Configuración de Brevo
 const brevoApiKey = process.env.BREVO_API_KEY;
 // Usar email de Brevo como remitente (o el configurado)
@@ -23,13 +30,13 @@ if (brevoApiKey) {
 export const sendEmail = async (to, subject, text, html) => {
     const startTime = Date.now();
     console.log(`[EMAIL] ==========================================`);
-    console.log(`[EMAIL] Iniciando envío de correo a: ${to}`);
+    console.log(`[EMAIL] Iniciando envío de correo a: ${obfuscateEmail(to)}`);
     console.log(`[EMAIL] Asunto: ${subject}`);
     console.log(`[EMAIL] Timestamp: ${new Date().toISOString()}`);
     
     try {
         if (!to || !validator.isEmail(to)) {
-            console.error(`[EMAIL] ❌ Email inválido: ${to}`);
+            console.error(`[EMAIL] ❌ Email inválido: ${obfuscateEmail(to)}`);
             throw new Error('La dirección de correo electrónico no es válida');
         }
 
@@ -41,10 +48,10 @@ export const sendEmail = async (to, subject, text, html) => {
             );
         }
 
-        console.log(`[EMAIL] ✅ Email validado: ${to}`);
+        console.log(`[EMAIL] ✅ Email validado: ${obfuscateEmail(to)}`);
         console.log(`[EMAIL] Configuración:`, {
             from: `${fromName} <${fromEmail}>`,
-            to: to,
+            to: obfuscateEmail(to),
             service: 'Brevo'
         });
 
@@ -74,7 +81,7 @@ export const sendEmail = async (to, subject, text, html) => {
             const errorData = await response.json().catch(() => ({
                 message: `HTTP ${response.status}: ${response.statusText}`
             }));
-            console.error(`[EMAIL] ❌ Error HTTP ${response.status}:`, errorData);
+            console.error(`[EMAIL] ❌ Error HTTP ${response.status}:`, errorData?.message || 'Error desconocido de Brevo');
             throw new EmailSendError(
                 errorData.message || `Error ${response.status} al enviar email`,
                 { code: response.status, brevoError: errorData }
@@ -90,10 +97,6 @@ export const sendEmail = async (to, subject, text, html) => {
         const duration = Date.now() - startTime;
         console.error(`[EMAIL] ❌ Error después de ${duration}ms`);
         console.error(`[EMAIL] Mensaje de error: ${error.message}`);
-        
-        if (error.stack) {
-            console.error(`[EMAIL] Stack:`, error.stack);
-        }
         
         // Detectar errores específicos de Brevo
         const errorMessage = error.message || '';

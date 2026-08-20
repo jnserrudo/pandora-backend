@@ -31,9 +31,23 @@ export const getAllUsers = async (req, res) => {
             },
             orderBy: { createdAt: 'desc' }
         });
-        res.status(200).json(users);
+
+        const withEventCounts = await Promise.all(users.map(async (user) => {
+            const eventCount = await prisma.event.count({
+                where: { commerce: { ownerId: user.id } }
+            });
+            return {
+                ...user,
+                _count: {
+                    ...user._count,
+                    events: eventCount,
+                }
+            };
+        }));
+
+        res.status(200).json(withEventCounts);
     } catch (error) {
-        console.error(error);
+        console.error('[USER] Error:', error.message);
         res.status(500).json({ message: 'Error al obtener usuarios' });
     }
 };
@@ -62,7 +76,7 @@ export const getUserById = async (req, res) => {
         }
         res.status(200).json(user);
     } catch (error) {
-        console.error(error);
+        console.error('[USER] Error:', error.message);
         res.status(500).json({ message: 'Error al obtener usuario' });
     }
 };
@@ -87,10 +101,81 @@ export const getUserContent = async (req, res) => {
         // Extraer todos los eventos de los comercios
         const events = commerces.flatMap(commerce => commerce.events || []);
 
-        res.status(200).json({ events, commerces });
+        const advertisements = await prisma.advertisement.findMany({
+            where: { commerce: { ownerId: userId } },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.status(200).json({ events, commerces, advertisements });
     } catch (error) {
-        console.error(error);
+        console.error('[USER] Error:', error.message);
         res.status(500).json({ message: 'Error al obtener contenido del usuario' });
+    }
+};
+
+/**
+ * Actualiza rol / isActive de un usuario (solo ADMIN).
+ */
+export const adminUpdateUser = async (req, res) => {
+    try {
+        const targetId = parseInt(req.params.id);
+        const { role, isActive } = req.body || {};
+
+        if (!Number.isInteger(targetId)) {
+            return res.status(400).json({ message: 'ID inválido' });
+        }
+
+        const oldUser = await prisma.user.findUnique({ where: { id: targetId } });
+        if (!oldUser) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+
+        if (targetId === req.user.id && isActive === false) {
+            return res.status(400).json({ message: 'No podés desactivar tu propia cuenta' });
+        }
+
+        const data = {};
+        if (role !== undefined) {
+            const allowed = ['USER', 'OWNER', 'ADMIN'];
+            if (!allowed.includes(role)) {
+                return res.status(400).json({ message: 'Rol inválido' });
+            }
+            data.role = role;
+        }
+        if (isActive !== undefined) {
+            data.isActive = Boolean(isActive);
+        }
+        if (Object.keys(data).length === 0) {
+            return res.status(400).json({ message: 'Nada para actualizar' });
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: targetId },
+            data,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                isActive: true,
+                createdAt: true,
+            }
+        });
+
+        await auditService.createLog({
+            userId: req.user.id,
+            action: 'UPDATE',
+            resourceType: 'USER',
+            resourceId: targetId,
+            oldData: { role: oldUser.role, isActive: oldUser.isActive },
+            newData: { role: updatedUser.role, isActive: updatedUser.isActive },
+            ipAddress: req.ip
+        });
+
+        res.status(200).json(updatedUser);
+    } catch (error) {
+        console.error('[USER] Error:', error.message);
+        res.status(500).json({ message: 'Error al actualizar usuario' });
     }
 };
 
@@ -103,7 +188,7 @@ export const getMyProfile = async (req, res) => {
         const userProfile = await userModel.getUserProfileModel(req.user.id);
         res.status(200).json(userProfile);
     } catch (error) {
-        console.log(error);
+        console.error('[USER] Error:', error.message);
         res.status(error.statusCode || 500).json({ message: error.message });
     }
 };
@@ -129,7 +214,7 @@ export const updateMyProfile = async (req, res) => {
 
         res.status(200).json(updatedUser);
     } catch (error) {
-        console.log(error);
+        console.error('[USER] Error:', error.message);
         res.status(error.statusCode || 500).json({ message: error.message });
     }
 };

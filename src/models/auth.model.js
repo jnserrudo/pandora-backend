@@ -23,6 +23,11 @@ export const registerUserService = async (userData) => {
     throwError("Validación de captcha fallida.", 400);
   }
 
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(password)) {
+    throwError("La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial.", 400);
+  }
+
   const normalizedEmail = email.toLowerCase().trim();
   const normalizedUsername = username.toLowerCase().trim();
   const existingUser = await prisma.user.findFirst({
@@ -31,9 +36,9 @@ export const registerUserService = async (userData) => {
 
   if (existingUser) {
     const message =
-      existingUser.email === email
-        ? "Email already in use."
-        : "Username already exists.";
+      existingUser.email === normalizedEmail
+        ? "El email ya está en uso."
+        : "El nombre de usuario ya existe.";
     throwError(message, 409);
   }
 
@@ -68,7 +73,7 @@ export const loginUserService = async (identifier, password, captchaToken) => {
   });
 
   if (!user) {
-    throwError("Invalid credentials.", 401);
+    throwError("Credenciales inválidas.", 401);
   }
 
   if (user.failedLoginAttempts >= 3) {
@@ -80,13 +85,21 @@ export const loginUserService = async (identifier, password, captchaToken) => {
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
-  
+
   if (!isPasswordValid) {
     await prisma.user.update({
       where: { id: user.id },
       data: { failedLoginAttempts: { increment: 1 } },
     });
-    throwError("Invalid credentials.", 401);
+    throwError("Credenciales inválidas.", 401);
+  }
+
+  // Resetear intentos fallidos al validar contraseña correcta
+  if (user.failedLoginAttempts > 0) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginAttempts: 0 }
+    });
   }
 
   // Si requiere verificación de cuenta
@@ -117,23 +130,23 @@ export const loginUserService = async (identifier, password, captchaToken) => {
 
 export const refreshAccessTokenService = async (token) => {
   if (!token) {
-    throwError("Refresh Token is required.", 401);
+    throwError("Se requiere el Refresh Token.", 401);
   }
 
-  const decoded = verifyRefreshToken(token);
-  if (!decoded) {
-    throwError("Invalid or expired Refresh Token.", 403);
+  const result = verifyRefreshToken(token);
+  if (!result.valid) {
+    throwError("Refresh Token inválido o expirado.", 403);
   }
 
   const user = await prisma.user.findFirst({
     where: {
-      id: decoded.id,
+      id: result.payload.id,
       refreshToken: token,
     },
   });
 
   if (!user) {
-    throwError("Refresh Token is not valid or has been revoked.", 403);
+    throwError("El Refresh Token no es válido o ha sido revocado.", 403);
   } // 1. Genera un NUEVO Access Token
 
   const newAccessTokenPayload = {
@@ -162,14 +175,18 @@ export const refreshAccessTokenService = async (token) => {
 };
 
 export const logoutUserService = async (userId) => {
-  await prisma.user.update({
-    where: { id: userId },
-    data: { refreshToken: null },
-  });
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: null },
+    });
+  } catch (error) {
+    if (error.code !== 'P2025') throw error;
+  }
 };
 
 export const verifyOTPService = async (email, otp) => {
-  const user = await prisma.user.findFirst({ where: { email } });
+  const user = await prisma.user.findFirst({ where: { email: email.toLowerCase().trim() } });
   if (!user) throwError("Usuario no encontrado", 404);
 
   const record = await prisma.verificationToken.findFirst({

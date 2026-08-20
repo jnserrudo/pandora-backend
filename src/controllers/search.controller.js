@@ -5,14 +5,14 @@ export const searchGlobal = async (req, res) => {
     const { q } = req.query; 
 
     if (!q || q.trim() === '') {
-        return res.status(400).json({ message: 'Search query (q) is required.' });
+        return res.status(400).json({ message: 'El término de búsqueda (q) es requerido.' });
     }
     
     try {
         const results = await searchModel.searchGlobalModel(q);
         res.status(200).json(results);
     } catch (error) {
-        console.error('Search error:', error);
-        res.status(500).json({ message: 'An error occurred during the search.' });
+        console.error('[SEARCH] Error:', error.message);
+        res.status(500).json({ message: 'Ocurrió un error durante la búsqueda.' });
     }
 };

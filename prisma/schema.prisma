@@ -47,6 +47,19 @@ model User {
   updatedAt DateTime @updatedAt
 
   auditLogs AuditLog[]
+  favorites Favorite[]
+}
+
+model Favorite {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  resourceType String
+  resourceId   Int
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resourceType, resourceId])
+  @@index([userId])
 }
 
 enum Role {

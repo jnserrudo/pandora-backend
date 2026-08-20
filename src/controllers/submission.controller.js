@@ -28,7 +28,7 @@ export const createSubmission = async (req, res) => {
 
         res.status(201).json(submission);
     } catch (error) {
-        console.error("Error in createSubmission:", error);
+        console.error('[SUBMISSION] Error creando solicitud:', error.message);
         const statusCode = error.statusCode || 500;
         const message = statusCode === 500 ? "Error interno del servidor" : error.message;
         res.status(statusCode).json({ message });
@@ -40,7 +40,7 @@ export const getSubmissions = async (req, res) => {
         const submissions = await submissionModel.getAllSubmissionsModel();
         res.status(200).json(submissions);
     } catch (error) {
-        console.error("Error in getSubmissions:", error);
+        console.error('[SUBMISSION] Error obteniendo solicitudes:', error.message);
         const statusCode = error.statusCode || 500;
         const message = statusCode === 500 ? "Error interno del servidor" : error.message;
         res.status(statusCode).json({ message });
@@ -62,7 +62,7 @@ export const replySubmission = async (req, res) => {
         const { adminResponse, status } = req.body;
         
         const oldSubmission = await submissionModel.getSubmissionByIdModel(id);
-        if (!oldSubmission) throwError('Submission not found', 404);
+        if (!oldSubmission) throwError('Solicitud no encontrada', 404);
 
         const submission = await submissionModel.updateSubmissionStatusModel(id, status || 'RESPONDED', adminResponse);
 
@@ -95,36 +95,44 @@ export const replySubmission = async (req, res) => {
             });
 
             if (commerce) {
-                // Intentamos extraer el nuevo nivel del mensaje o metadatos (asumimos lógica simple por ahora)
-                // Por simplicidad, si es upgrade asumimos que sube al menos a nivel 2 o lo que diga el mensaje
-                const newLevel = parseInt(submission.message.match(/\d+/) || 2); 
-                
+                const levelMatch =
+                    submission.message.match(/(?:nivel|level|plan)\s*[:=]?\s*([1-4])/i) ||
+                    submission.message.match(/\b([2-4])\b/);
+                const parsed = levelMatch ? parseInt(levelMatch[1], 10) : 2;
+                const newLevel = Number.isFinite(parsed) && parsed >= 1 && parsed <= 4 ? parsed : 2;
+
+                const plan = await prisma.plan.findUnique({ where: { level: newLevel } });
+
                 await prisma.commerce.update({
                     where: { id: commerce.id },
-                    data: { planLevel: newLevel }
-                });
-
-                // Registrar en PlanHistory
-                const historyEntry = await prisma.planHistory.create({
                     data: {
-                        commerceId: commerce.id,
-                        oldLevel: commerce.planLevel,
-                        newLevel: newLevel,
-                        planId: 1, // Por ahora default a un ID de plan existente o creamos uno
-                        totalPaid: 0, // Ajustar según lógica de pago
-                        method: 'OFFER',
-                        paymentProof: submission.attachmentUrl
+                        planLevel: newLevel,
+                        ...(plan && { planId: plan.id })
                     }
                 });
 
-                // REGISTRO DE AUDITORÍA GLOBAL
+                let historyEntry = null;
+                if (plan) {
+                    historyEntry = await prisma.planHistory.create({
+                        data: {
+                            commerceId: commerce.id,
+                            oldLevel: commerce.planLevel,
+                            newLevel: newLevel,
+                            planId: plan.id,
+                            totalPaid: 0,
+                            method: 'OFFER',
+                            paymentProof: submission.attachmentUrl
+                        }
+                    });
+                }
+
                 await auditService.createLog({
                     userId: req.user.id,
                     action: 'PLAN_UPGRADE',
                     resourceType: 'COMMERCE',
                     resourceId: commerce.id,
                     oldData: { planLevel: commerce.planLevel },
-                    newData: { planLevel: newLevel, planHistoryId: historyEntry.id },
+                    newData: { planLevel: newLevel, planHistoryId: historyEntry?.id || null },
                     ipAddress: req.ip
                 });
             }
@@ -132,7 +140,7 @@ export const replySubmission = async (req, res) => {
 
         res.status(200).json(submission);
     } catch (error) {
-        console.error("Error in replySubmission:", error);
+        console.error('[SUBMISSION] Error respondiendo solicitud:', error.message);
         const statusCode = error.statusCode || 500;
         const message = statusCode === 500 ? "Error interno del servidor" : error.message;
         res.status(statusCode).json({ message });

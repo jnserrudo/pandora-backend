@@ -6,13 +6,21 @@ export const generateOTP = () => {
 };
 
 export const verifyTurnstileToken = async (token) => {
+    if (process.env.NODE_ENV === 'test' || process.env.SKIP_CAPTCHA === 'true') {
+        return true;
+    }
+
     if (!token) return false;
-    
+
     try {
         const secretKey = process.env.TURNSTILE_SECRET_KEY;
         if (!secretKey) {
-            console.warn("TURNSTILE_SECRET_KEY is not defined. Skipping validation.");
-            return true; // Bypass si no está configurado (útil en dev)
+            if (process.env.NODE_ENV === 'production') {
+                console.error('[CAPTCHA] TURNSTILE_SECRET_KEY is not defined. Rejecting captcha in production.');
+                return false;
+            }
+            console.warn('[CAPTCHA] TURNSTILE_SECRET_KEY is not defined. Skipping validation in development.');
+            return true;
         }
 
         const formData = new URLSearchParams();
@@ -27,7 +35,7 @@ export const verifyTurnstileToken = async (token) => {
         const data = await response.json();
         return data.success;
     } catch (error) {
-        console.error('Error verifying captcha:', error);
+        console.error('[CAPTCHA] Error verificando captcha:', error.message);
         return false;
     }
 };

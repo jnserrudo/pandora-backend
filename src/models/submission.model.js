@@ -1,15 +1,27 @@
 import prisma from '../db/prismaClient.js';
+import { moderateContent, attachModerationResource } from '../services/moderation.service.js';
 
 /**
  * Crea una nueva entrega/submission.
  */
 export const createSubmissionModel = async (data) => {
-    return prisma.submission.create({
+    const created = await prisma.submission.create({
         data: {
             ...data,
             userId: data.userId ? parseInt(data.userId) : null
         }
     });
+
+    const moderationResult = await moderateContent(
+        `${data.name || ''}\n${data.message || ''}`,
+        'SUBMISSION',
+        created.id,
+        [],
+        { fieldsAnalyzed: ['name', 'message', 'type'] }
+    );
+    await attachModerationResource(moderationResult.logId, created.id);
+
+    return created;
 };
 
 /**

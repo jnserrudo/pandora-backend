@@ -45,7 +45,7 @@ export const createLog = async ({
         return log;
     } catch (error) {
         // Fallback silencioso para no romper la transacción principal si la auditoría falla
-        console.error("Critical: Error saving to AuditLog:", error);
+        console.error('[AUDIT] Error crítico guardando log de auditoría:', error.message);
         return null;
     }
 };

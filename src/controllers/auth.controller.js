@@ -11,18 +11,14 @@ export const registerUser = async (req, res) => {
     
     try {
         const { email, username, password, name, captchaToken } = req.body;
-        console.log(`[AUTH] Datos recibidos - Email: ${email}, Username: ${username}, Name: ${name}`);
-        
+
         if (!email || !username || !password || !name) {
             console.log(`[AUTH] ❌ Datos incompletos en registro`);
-            return res.status(400).json({ message: 'Email, username, name, and password are required.' });
+            return res.status(400).json({ message: 'Se requieren email, nombre de usuario, nombre y contraseña.' });
         }
-        
-        // Pass the body to the service
-        console.log(`[AUTH] Llamando a registerUserService...`);
+
         const { user: newUser, otpCode } = await authModel.registerUserService(req.body);
-        console.log(`[AUTH] ✅ Usuario creado en DB - ID: ${newUser.id}, Email: ${newUser.email}`);
-        console.log(`[AUTH] OTP generado: ${otpCode}`);
+        console.log(`[AUTH] ✅ Usuario creado en DB`);
         
         // Despachar el correo electrónico con otpCode
         let emailSent = false;
@@ -36,7 +32,6 @@ export const registerUser = async (req, res) => {
         } catch (err) {
             emailError = err;
             console.error(`[AUTH] ❌ Error enviando email: ${err.message}`);
-            console.error(`[AUTH] Tipo de error: ${err.name}, Código: ${err.code}`);
             
             if (err instanceof EmailTimeoutError) {
                 console.log(`[AUTH] ⏱️  Timeout detectado - se habilitará reenvío`);
@@ -47,16 +42,21 @@ export const registerUser = async (req, res) => {
         console.log(`[AUTH] Proceso completado en ${duration}ms`);
         console.log(`[AUTH] Email enviado: ${emailSent}`);
         console.log(`[AUTH] CanResendOTP: ${!emailSent}`);
+
+        const exposeDebugOtp =
+            !emailSent &&
+            process.env.NODE_ENV !== 'production' &&
+            process.env.ALLOW_DEBUG_OTP === 'true';
         
         // Responder al cliente
         const response = { 
-            message: emailSent 
-                ? 'User registered successfully! Please check your email.' 
-                : 'User registered successfully! However, we could not send the verification email. Please use the "Resend Code" option or use the code shown below.',
+            message: emailSent
+                ? 'Usuario registrado exitosamente. Revisá tu email.'
+                : 'Usuario registrado exitosamente. No pudimos enviar el email de verificación. Usá "Reenviar código" o contactá a un admin.',
             user: newUser,
             emailSent: emailSent,
             canResendOTP: !emailSent,
-            debugOTP: !emailSent ? otpCode : undefined,
+            debugOTP: exposeDebugOtp ? otpCode : undefined,
             emailError: emailError && !emailSent ? {
                 code: emailError.code || 'EMAIL_ERROR',
                 message: emailError.message
@@ -82,7 +82,7 @@ export const registerUser = async (req, res) => {
         console.error(`[AUTH] ❌ Error en registro después de ${duration}ms:`, error.message);
         console.error(`[AUTH] Stack:`, error.stack);
         res.status(error.statusCode || 500).json({
-            message: error.message || 'Internal server error.',
+            message: error.message || 'Error interno del servidor.',
             requireCaptcha: error.requireCaptcha,
             isVerified: error.isVerified
         });
@@ -96,12 +96,12 @@ export const resendOTP = async (req, res) => {
     try {
         const { email } = req.body;
         if (!email) {
-            return res.status(400).json({ message: 'Email is required.' });
+            return res.status(400).json({ message: 'El email es requerido.' });
         }
 
         // Generar nuevo OTP
         const { user, otpCode } = await authModel.resendOTPService(email);
-        console.log('🔄 Reenviando OTP a:', user.email);
+        console.log(`[AUTH] 🔄 Reenviando OTP`);
 
         // Intentar enviar el email
         let emailSent = false;
@@ -110,7 +110,7 @@ export const resendOTP = async (req, res) => {
         try {
             await sendVerificationOTP(user.email, otpCode);
             emailSent = true;
-            console.log('✅ OTP reenviado exitosamente a:', user.email);
+            console.log('✅ OTP reenviado exitosamente');
         } catch (err) {
             emailError = err;
             console.error("❌ Error reenviando email OTP:", err.message);
@@ -143,7 +143,7 @@ export const resendOTP = async (req, res) => {
             ipAddress: req.ip
         });
     } catch (error) {
-        console.log(error);
+        console.error('[AUTH] Error:', error.message);
         res.status(error.statusCode || 500).json({
             message: error.message || 'Error al reenviar el código.',
             code: error.code
@@ -155,11 +155,10 @@ export const loginUser = async (req, res) => {
     try {
         const { identifier, password, captchaToken } = req.body;
         if (!identifier || !password) {
-            return res.status(400).json({ message: 'Identifier (email or username) and password are required.' });
+            return res.status(400).json({ message: 'Se requiere el identificador (email o nombre de usuario) y la contraseña.' });
         }
         const tokens = await authModel.loginUserService(identifier, password, captchaToken);
-        console.log('logeado');
-        res.status(200).json({ message: 'Login successful!', ...tokens });
+        res.status(200).json({ message: 'Inicio de sesión exitoso.', ...tokens });
 
         // Auditoría
         const user = await prisma.user.findFirst({ where: { OR: [{ email: identifier }, { username: identifier }] } });
@@ -171,9 +170,9 @@ export const loginUser = async (req, res) => {
             ipAddress: req.ip
         });
     } catch (error) {
-        console.log(error);
+        console.error('[AUTH] Error:', error.message);
         res.status(error.statusCode || 500).json({
-            message: error.message || 'Internal server error.',
+            message: error.message || 'Error interno del servidor.',
             requireCaptcha: error.requireCaptcha,
             isVerified: error.isVerified
         });
@@ -184,13 +183,13 @@ export const verifyOTP = async (req, res) => {
     try {
         const { email, otp } = req.body;
         if (!email || !otp) {
-            return res.status(400).json({ message: 'Email and OTP are required.' });
+            return res.status(400).json({ message: 'Se requieren el email y el código OTP.' });
         }
         const result = await authModel.verifyOTPService(email, otp);
-        res.status(200).json({ message: 'Cuenta verificada con éxito', ...result });
+        res.status(200).json({ message: 'Cuenta verificada con éxito.', ...result });
     } catch (error) {
-        console.log(error);
-        res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
+        console.error('[AUTH] Error:', error.message);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error interno del servidor.' });
     }
 };
 
@@ -198,21 +197,19 @@ export const refreshAccessToken = async (req, res) => {
     try {
         const { refreshToken } = req.body;
         const result = await authModel.refreshAccessTokenService(refreshToken);
-        console.log('refresh');
         res.status(200).json(result);
     } catch (error) {
-        console.log(error);
-        res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
+        console.error('[AUTH] Error:', error.message);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error interno del servidor.' });
     }
 };
 
 export const logoutUser = async (req, res) => {
     try {
         await authModel.logoutUserService(req.user.id);
-        console.log('logout');
-        res.status(200).json({ message: 'Logged out successfully.' });
+        res.status(200).json({ message: 'Sesión cerrada exitosamente.' });
     } catch (error) {
-        console.log(error);
-        res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error.' });
+        console.error('[AUTH] Error:', error.message);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error interno del servidor.' });
     }
 };

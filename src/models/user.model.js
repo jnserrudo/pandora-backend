@@ -19,7 +19,7 @@ export const getUserProfileModel = async (userId) => {
     
     // Si el usuario no existe o está inactivo lógicamente
     if (!user || !user.isActive) {
-        throwError('User not found or is inactive.', 404);
+        throwError('Usuario no encontrado o inactivo.', 404);
     }
 
     if (user) {
@@ -49,7 +49,7 @@ export const updateUserProfileModel = async (userId, data) => {
             },
         });
         if (existingUser) {
-            const message = existingUser.email === updateData.email ? 'Email is already taken.' : 'Username is already taken.';
+            const message = existingUser.email === updateData.email ? 'El email ya está en uso.' : 'El nombre de usuario ya está en uso.';
             throwError(message, 409);
         }
     }
@@ -67,10 +67,8 @@ export const updateUserProfileModel = async (userId, data) => {
             },
         });
     } catch (error) {
-        console.log(error);
         if (error.code === 'P2025') {
-            console.log('User not found.');
-            throwError('User not found.', 404);
+            throwError('Usuario no encontrado.', 404);
         }
         throw error;
     }

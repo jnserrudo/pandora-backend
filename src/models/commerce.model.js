@@ -1,5 +1,11 @@
 import prisma from '../db/prismaClient.js';
-import { moderateContent } from '../services/moderation.service.js';
+import {
+    moderateContent,
+    attachModerationResource,
+    collectImageUrls,
+    buildCommerceModerationText,
+    moderationFieldsChanged,
+} from '../services/moderation.service.js';
 import { throwError } from '../utils/error.utils.js';
 
 // --- FUNCIONES HELPER PÚBLICAS ---
@@ -33,16 +39,25 @@ const enforceGalleryLimits = (images, planLevel) => {
  * @param {number} planLevel - Opcional, nivel de plan a filtrar (1=Free, 2=Plata, 3=Oro, 4=Platino).
  * @returns {Promise<Array>} Lista de comercios.
  */
-export const getAllCommercesModel = async (planLevel = null) => {
+export const getAllCommercesModel = async (planLevel = null, { skip = 0, limit = 50, includeAll = false } = {}) => {
     return prisma.commerce.findMany({
-        where: { 
-            isActive: true,
+        where: {
+            ...(includeAll
+                ? {}
+                : { isActive: true, status: 'ACTIVE' }),
             ...(planLevel && { planLevel: parseInt(planLevel) })
         },
+        skip,
+        take: limit,
         orderBy: [
             { planLevel: 'desc' },
             { name: 'asc' }
         ],
+        ...(includeAll && {
+            include: {
+                owner: { select: { id: true, name: true, email: true } },
+            },
+        }),
     });
 };
 
@@ -64,17 +79,15 @@ export const getPendingCommercesModel = async () => {
  */
 
 
-export const getCommercesByCategoryModel = async (category) => {
-    // Ya no validamos contra una lista hardcodeada (categories),
-    // permitimos que el sistema busque cualquier categoría dinámica.
-    
-    // Usamos la categoría en la consulta
+export const getCommercesByCategoryModel = async (category, { skip = 0, limit = 50 } = {}) => {
     return prisma.commerce.findMany({
-        where: { 
-            category: category, 
-            // status: 'ACTIVE',
+        where: {
+            category: category,
+            status: 'ACTIVE',
             isActive: true
         },
+        skip,
+        take: limit,
         orderBy: { name: 'asc' },
     });
 };
@@ -83,14 +96,13 @@ export const getCommercesByCategoryModel = async (category) => {
  * @param {number} id - El ID del comercio.
  * @returns {Promise<Object>} El objeto del comercio.
  */
-export const getCommerceByIdModel = async (id) => {
+export const getCommerceByIdModel = async (id, viewer = null) => {
     const commerce = await prisma.commerce.findUnique({
         where: { id: parseInt(id) },
         include: {
             categories: true, // Incluimos info de las categorías múltiples vinculadas
             branches: true,   // Incluimos info de sus sucursales
             events: {
-                where: { status: 'SCHEDULED' },
                 orderBy: { startDate: 'asc' },
             },
             comments: {
@@ -102,7 +114,18 @@ export const getCommerceByIdModel = async (id) => {
         },
     });
     if (!commerce) {
-        throwError('Commerce not found.', 404);
+        throwError('Comercio no encontrado.', 404);
+    }
+    const isPrivileged = viewer && (
+        viewer.role === 'ADMIN' || Number(viewer.id) === Number(commerce.ownerId)
+    );
+    if (!isPrivileged && (commerce.status !== 'ACTIVE' || !commerce.isActive)) {
+        throwError('Comercio no encontrado.', 404);
+    }
+    if (!isPrivileged) {
+        commerce.events = (commerce.events || []).filter(
+            (event) => event.status === 'SCHEDULED' && event.isActive && event.paymentStatus !== 'REJECTED'
+        );
     }
     return commerce;
 };
@@ -131,12 +154,18 @@ export const createCommerceModel = async (data, ownerId) => {
     const finalPlanLevel = data.planLevel || 1;
     
     // 🛡️ AI GUARD: Analizar contenido antes de crear
-    const textToAnalyze = `${data.name}\n${data.description}\n${data.shortDescription || ''}`;
-    const moderationResult = await moderateContent(textToAnalyze, 'COMMERCE');
-
-    if (!moderationResult.approved) {
-        throwError(moderationResult.reason || 'Contenido rechazado por el sistema de moderación', 400);
-    }
+    const moderationResult = await moderateContent(
+        buildCommerceModerationText(data),
+        'COMMERCE',
+        null,
+        collectImageUrls(data),
+        {
+            fieldsAnalyzed: [
+                'name', 'shortDescription', 'description', 'address',
+                'phone', 'whatsapp', 'website', 'facebook', 'instagram', 'imágenes',
+            ],
+        }
+    );
 
     // 0. Validar existencia de categorías para evitar P2025
     let categoryConnectOptions = {};
@@ -204,9 +233,10 @@ export const createCommerceModel = async (data, ownerId) => {
         });
 
         if (moderationResult.requiresReview) {
-            console.log(`⚠️ Comercio ${newCommerce.id} flagueado para revisión extra`);
+            console.warn(`[MODERACIÓN] Comercio ${newCommerce.id} requiere revisión adicional`);
         }
 
+        await attachModerationResource(moderationResult.logId, newCommerce.id);
         return newCommerce;
     });
 };
@@ -223,6 +253,7 @@ export const validateCommerceModel = async (id, adminId, status, reason) => {
                 validationReason: reason,
                 validatedById: adminId,
                 validatedAt: new Date(),
+                ...(status === 'ACTIVE' && { isActive: true }),
                 ...(status === 'REJECTED' && { isActive: false })
             },
             include: { owner: true }
@@ -263,7 +294,7 @@ export const getCommerceByOwnerModel = async (ownerId) => {
         },
     });
     if (!commerce) {
-        throwError('Commerce for this owner not found.', 404);
+        throwError('Comercio para este dueño no encontrado.', 404);
     }
     return commerce;
 };
@@ -282,12 +313,12 @@ export const updateCommerceModel = async (id, data, userId, userRole) => {
     });
 
     if (!commerce) {
-        throwError('Commerce not found.', 404);
+        throwError('Comercio no encontrado.', 404);
     }
 
     // 2. Verificar permisos: Solo el dueño o un ADMIN pueden editar
     if (commerce.ownerId !== userId && userRole !== 'ADMIN') {
-        throwError('You do not have permission to update this commerce.', 403);
+        throwError('No tenés permiso para actualizar este comercio.', 403);
     }
 
     // 3. Limpiar datos (evitar que el dueño se auto-apruebe o cambie campos sensibles)
@@ -305,6 +336,22 @@ export const updateCommerceModel = async (id, data, userId, userRole) => {
     if (updateData.externalLink !== undefined) updateData.externalLink = sanitizeUrl(updateData.externalLink);
     if (updateData.instagram !== undefined) updateData.instagram = sanitizeUrl(updateData.instagram);
     if (updateData.facebook !== undefined) updateData.facebook = sanitizeUrl(updateData.facebook);
+
+    const merged = { ...commerce, ...updateData };
+    const moderatedFields = [
+        'name', 'description', 'shortDescription', 'address', 'phone',
+        'whatsapp', 'website', 'facebook', 'instagram', 'externalLink',
+        'coverImage', 'galleryImages',
+    ];
+    if (moderationFieldsChanged(commerce, merged, moderatedFields)) {
+        await moderateContent(
+            buildCommerceModerationText(merged),
+            'COMMERCE',
+            commerce.id,
+            collectImageUrls(merged),
+            { fieldsAnalyzed: moderatedFields }
+        );
+    }
 
     // Lógica Categorías Múltiples (Si mandan 'categoryIds')
     let categoryUpdateOptions = undefined;
@@ -342,7 +389,7 @@ export const updateCommerceByOwnerModel = async (ownerId, data) => {
 
         // Fetch current commerce to get planLevel
         const currentCommerce = await prisma.commerce.findFirst({ where: { ownerId } });
-        if (!currentCommerce) throwError('Commerce for this owner not found.', 404);
+        if (!currentCommerce) throwError('Comercio para este dueño no encontrado.', 404);
 
         if (updateData.galleryImages) {
             updateData.galleryImages = enforceGalleryLimits(updateData.galleryImages, currentCommerce.planLevel);
@@ -351,6 +398,23 @@ export const updateCommerceByOwnerModel = async (ownerId, data) => {
         if (updateData.externalLink !== undefined) updateData.externalLink = sanitizeUrl(updateData.externalLink);
         if (updateData.instagram !== undefined) updateData.instagram = sanitizeUrl(updateData.instagram);
         if (updateData.facebook !== undefined) updateData.facebook = sanitizeUrl(updateData.facebook);
+
+        const merged = { ...currentCommerce, ...updateData };
+        const moderatedFields = [
+            'name', 'description', 'shortDescription', 'address', 'phone',
+            'whatsapp', 'website', 'facebook', 'instagram', 'externalLink',
+            'coverImage', 'galleryImages',
+        ];
+        if (moderationFieldsChanged(currentCommerce, merged, moderatedFields)) {
+            await moderateContent(
+                buildCommerceModerationText(merged),
+                'COMMERCE',
+                currentCommerce.id,
+                collectImageUrls(merged),
+                { fieldsAnalyzed: moderatedFields }
+            );
+        }
+
 
         // Lógica de Categorías Múltiples Owner
         let categoryUpdateOptions = undefined;
@@ -373,7 +437,7 @@ export const updateCommerceByOwnerModel = async (ownerId, data) => {
     } catch (error) {
         // P2025 es el código de error de Prisma para "registro no encontrado" en una actualización.
         if (error.code === 'P2025') {
-            throwError('Commerce for this owner not found.', 404);
+            throwError('Comercio para este dueño no encontrado.', 404);
         }
         throw error; // Re-lanza otros errores.
     }

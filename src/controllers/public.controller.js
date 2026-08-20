@@ -9,7 +9,7 @@ export const getPublicStats = async (req, res) => {
             prisma.plan.count()
         ]);
 
-        console.log('Public Stats Debug:', { articlesCount, eventsCount, commercesCount, plansCount });
+        console.log(`[PUBLIC] Stats - artículos: ${articlesCount}, eventos: ${eventsCount}, comercios: ${commercesCount}`);
 
         res.status(200).json({
             articles: articlesCount,
@@ -18,7 +18,7 @@ export const getPublicStats = async (req, res) => {
             plans: plansCount
         });
     } catch (error) {
-        console.error("Error fetching public stats:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('[PUBLIC] Error:', error.message);
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
