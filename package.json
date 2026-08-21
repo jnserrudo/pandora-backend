@@ -12,6 +12,7 @@
     "db:up": "docker compose up -d",
     "db:push": "node src/db/push-schema.js",
     "db:seed": "node src/db/seed.js",
+    "db:seed:prod-demo": "node src/db/seed-prod-demo.js",
     "db:studio": "node src/db/studio.js",
     "db:reset": "node src/db/reset-local.js"
   },
