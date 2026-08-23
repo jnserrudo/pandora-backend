@@ -74,6 +74,11 @@ describe('assistant.guide listados', () => {
     expect(items[0].label).toBe('La Casona de Salta');
   });
 
+  it('lista varios comercios con Mostrame comercios (no uno solo)', () => {
+    const items = itemsFor('list_commerces', catalog, 'Mostrame comercios');
+    expect(items.length).toBeGreaterThanOrEqual(2);
+  });
+
   it('mezcla entidades en descubrir', () => {
     const items = itemsFor('discover', catalog, 'recomendame algo');
     expect(items.some((item) => item.type === 'commerce')).toBe(true);

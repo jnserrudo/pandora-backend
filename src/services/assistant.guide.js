@@ -1,24 +1,40 @@
 const INTENTS = [
-  { id: 'create_commerce', test: /carg(ar|o)|alta de|sumar mi|publicar.*(local|comer)|mi local|mi comercio/i },
+  { id: 'create_commerce', test: /carg(ar|o)|alta de|sumar mi|publicar.*(local|comer)|mi local|mi comercio|dar de alta/i },
   { id: 'create_event', test: /(crear|cargar|solicitar|publicar).*(evento)|evento.*(crear|cargar|solicitar)/i },
-  { id: 'favorite', test: /favorit/i },
-  { id: 'comment', test: /coment|opini[oó]n|rese[nñ]a/i },
-  { id: 'register', test: /registr|crear cuenta|sign ?up|hacer(me)? socio/i },
-  { id: 'login', test: /iniciar sesi[oó]n|login|entrar|contrase[nñ]a|email o usuario/i },
-  { id: 'plans', test: /plan|precio|oro|plata|gratis|pagar|upgrade/i },
-  { id: 'contact', test: /contact|buz[oó]n|escribirles|enviar(les)? un mensaje/i },
-  { id: 'profile', test: /perfil|dni/i },
-  { id: 'submissions', test: /solicitud|tr[aá]mite|mis mensajes/i },
-  { id: 'owner_panel', test: /mis comercios|mi panel|productos|faqs|sucursal/i },
+  { id: 'favorite', test: /favorit|guardar.*local|coraz[oó]n/i },
+  { id: 'comment', test: /coment|opini[oó]n|rese[nñ]a|puntuar|calificar/i },
+  { id: 'register', test: /registr|crear cuenta|sign ?up|hacer(me)? socio|nueva cuenta/i },
+  { id: 'login', test: /iniciar sesi[oó]n|login|entrar|contrase[nñ]a|email o usuario|olvid[eé].*clave/i },
+  { id: 'plans', test: /plan|precio|tarif|oro|plata|gratis|pagar|upgrade|cu[aá]nto (cuesta|sale)/i },
+  { id: 'contact', test: /contact|buz[oó]n|escribirles|enviar(les)? un mensaje|hablar con|soporte/i },
+  { id: 'profile', test: /perfil|dni|mis datos/i },
+  { id: 'submissions', test: /solicitud|tr[aá]mite|mis mensajes|estado de mi/i },
+  { id: 'owner_panel', test: /mis comercios|mi panel|productos|faqs|sucursal|due[nñ]o/i },
   { id: 'admin_guard', test: /ai guard|flagged|moderar/i },
   { id: 'admin_validate', test: /validar|pendiente|cola admin|aprobar/i },
-  { id: 'list_articles', test: /revista|art[ií]culo|noticia|magazine|nota(s)?\b/i },
-  { id: 'list_events', test: /evento|agenda|pe[nñ]a|folklore|qu[eé] hay.*(noche|finde|viernes)|recital|show/i },
-  { id: 'list_commerces', test: /comercio|local(es)?|lugares|sitios|resto|bar|d[oó]nde (comer|salir|ir)|gastronom|casona|teatro|caf[eé]/i },
-  { id: 'discover', test: /mostr(ame|á)|list(á|ame)|recomend|suger[ií]|descubr|qu[eé] hay|qu[eé] (puedo|podemos) (hacer|visitar|ver)/i },
-  { id: 'overview', test: /qu[eé] (es|puedo)|hola|buenas|ayud[aeá]|c[oó]mo funciona|para qu[eé] sirve/i },
+  { id: 'list_articles', test: /revista|art[ií]culo|noticia|magazine|nota(s)?\b|leer\b/i },
+  { id: 'list_events', test: /evento|agenda|pe[nñ]a|folklore|qu[eé] hay.*(noche|finde|viernes)|recital|show|fiesta|salida(s)?\b|qu[eé] hacer.*(noche|finde)/i },
+  { id: 'list_commerces', test: /comercio|local(es)?|lugares|sitios|resto|bar|d[oó]nde (comer|salir|ir|tomar)|gastronom|casona|teatro|caf[eé]|boliche|parrilla|pizza|cerveza/i },
+  { id: 'discover', test: /mostr(ame|á)|list(á|ame)|recomend|suger[ií]|descubr|qu[eé] hay|qu[eé] (puedo|podemos) (hacer|visitar|ver)|busc(ame|á|a)|conoc[eé]s|ten[eé]s|hay algo|opciones/i },
+  { id: 'overview', test: /qu[eé] (es|puedo)|hola|buenas|buenos d[ií]as|ayud[aeá]|c[oó]mo funciona|para qu[eé] sirve|qui[eé]n sos/i },
 ];
 
+export function detectIntent(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return 'overview';
+  const found = INTENTS.find((item) => item.test.test(raw));
+  if (found) return found.id;
+
+  // Preguntas / búsquedas abiertas → descubrir (buscar en catálogo + responder)
+  if (
+    /\?$/.test(raw) ||
+    /\b(d[oó]nde|c[oó]mo|cu[aá]ndo|por qu[eé]|alguna|alguno|busco|necesito|quiero|gusta|recomenda)/i.test(raw) ||
+    raw.split(/\s+/).filter(Boolean).length >= 3
+  ) {
+    return 'discover';
+  }
+  return 'overview';
+}
 const STOPWORDS = new Set([
   'me', 'mi', 'mis', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
   'de', 'del', 'al', 'en', 'por', 'para', 'con', 'y', 'o', 'a',
@@ -73,12 +89,6 @@ export function humanizeLabel(value, fallback = '') {
       .join(' ');
   }
   return raw;
-}
-
-export function detectIntent(text) {
-  const raw = String(text || '').trim();
-  const found = INTENTS.find((item) => item.test.test(raw));
-  return found?.id || 'overview';
 }
 
 export function actionsFor(intent, role = 'GUEST') {
@@ -174,11 +184,11 @@ export function actionsFor(intent, role = 'GUEST') {
 
 export function processHint(intent, role = 'GUEST') {
   const hints = {
-    overview: 'Explicá para qué sirve PANDORA (descubrir Salta: locales, agenda y revista; no hay carrito). Ofrecé 2 caminos: explorar o cargar un local.',
+    overview: 'Explicá para qué sirve PANDORA (descubrir Salta: locales, agenda y revista; no hay carrito). Respondé también si preguntó otra cosa concreta sobre la app. Ofrecé 2 caminos: explorar o cargar un local.',
     list_commerces: 'Hay tarjetas reales abajo (foto, rubro, dirección). En 2 frases presentá el listado y decí que toque una para ver el detalle, o “Ver todos”. No copies los nombres.',
     list_events: 'Hay tarjetas de eventos abajo con fecha. Contá que la agenda pública muestra lo aprobado y que puede abrir uno. No copies toda la lista.',
     list_articles: 'Hay notas de la revista abajo. Invitalo a abrir una o ir a Magazine. No copies los títulos.',
-    discover: 'Hay una mezcla de fichas reales abajo. En 2 frases invitalo a mirar las tarjetas o a filtrar por comercios, eventos o revista.',
+    discover: 'Respondé a la pregunta concreta. Si hay fichas abajo, presentalas en 1-2 frases. Si es cómo usar la app, explicá el trámite. Si no hay match, decilo y ofrecé explorar comercios/eventos/revista.',
     register: 'Pasos: Registrarse, correo + usuario + contraseña, código OTP del mail. Después puede guardar favoritos y dar de alta un local (queda PENDING).',
     login: 'Se entra con email o usuario (da igual) y la contraseña. Si no tiene cuenta, registrarse.',
     create_commerce: role === 'GUEST'
@@ -267,12 +277,17 @@ function searchNamed(catalog, query) {
     ...(catalog.events || []),
     ...(catalog.articles || []),
   ];
+  // Solo matches fuertes por nombre (score >= 4 = token en el label)
   return all
     .map((item) => ({ item, score: scoreItem(item, tokens) }))
     .filter((row) => row.score >= 4)
     .sort((a, b) => b.score - a.score)
     .map((row) => row.item)
-    .slice(0, 6);
+    .slice(0, 8);
+}
+
+function hasNameTokens(query, type) {
+  return filterByTypeWords(tokenize(query), type).length > 0;
 }
 
 export function itemsFor(intent, catalog, query = '') {
@@ -280,32 +295,67 @@ export function itemsFor(intent, catalog, query = '') {
   const events = catalog?.events || [];
   const articles = catalog?.articles || [];
   const named = searchNamed({ commerces, events, articles }, query);
-
-  if (named.length === 1) return named;
-
   const namedOf = (type) => named.filter((item) => item.type === type);
 
+  // Listados explícitos: siempre devolver varios (8), salvo que pidan un nombre concreto con match fuerte
   if (intent === 'list_commerces') {
-    return namedOf('commerce').length ? namedOf('commerce') : pickList(commerces, query, 'commerce', 8);
+    const hits = namedOf('commerce');
+    if (hits.length >= 2 && hasNameTokens(query, 'commerce')) return hits.slice(0, 8);
+    if (hits.length === 1 && hasNameTokens(query, 'commerce')) {
+      // Un nombre puntual: igual rellená con del mismo rubro / más locales
+      const rest = pickList(commerces, query, 'commerce', 8).filter((item) => item.id !== hits[0].id);
+      return [hits[0], ...rest].slice(0, 8);
+    }
+    return pickList(commerces, query, 'commerce', 8);
   }
   if (intent === 'list_events') {
-    return namedOf('event').length ? namedOf('event') : pickList(events, query, 'event', 8);
+    const hits = namedOf('event');
+    if (hits.length >= 2 && hasNameTokens(query, 'event')) return hits.slice(0, 8);
+    if (hits.length === 1 && hasNameTokens(query, 'event')) {
+      const rest = pickList(events, query, 'event', 8).filter((item) => item.id !== hits[0].id);
+      return [hits[0], ...rest].slice(0, 8);
+    }
+    return pickList(events, query, 'event', 8);
   }
   if (intent === 'list_articles') {
-    return namedOf('article').length ? namedOf('article') : pickList(articles, query, 'article', 6);
+    const hits = namedOf('article');
+    if (hits.length >= 2 && hasNameTokens(query, 'article')) return hits.slice(0, 6);
+    if (hits.length === 1 && hasNameTokens(query, 'article')) {
+      const rest = pickList(articles, query, 'article', 6).filter((item) => item.id !== hits[0].id);
+      return [hits[0], ...rest].slice(0, 6);
+    }
+    return pickList(articles, query, 'article', 6);
   }
   if (intent === 'discover') {
-    return named.length
-      ? named
-      : [
-          ...pickList(commerces, query, 'commerce', 3),
-          ...pickList(events, query, 'event', 3),
-          ...pickList(articles, query, 'article', 2),
-        ];
+    if (named.length >= 2) return named.slice(0, 8);
+    if (named.length === 1) {
+      return [
+        named[0],
+        ...pickList(commerces, query, 'commerce', 3),
+        ...pickList(events, query, 'event', 2),
+        ...pickList(articles, query, 'article', 2),
+      ]
+        .filter((item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx)
+        .slice(0, 8);
+    }
+    return [
+      ...pickList(commerces, query, 'commerce', 4),
+      ...pickList(events, query, 'event', 3),
+      ...pickList(articles, query, 'article', 2),
+    ].slice(0, 8);
   }
   if (intent === 'comment' || intent === 'favorite') {
-    return pickList(commerces, query, 'commerce', 5);
+    return pickList(commerces, query, 'commerce', 6);
   }
-  if (named.length) return named.slice(0, 4);
+  // overview u otros: un solo match fuerte por nombre = esa ficha; si no, mezcla
+  if (named.length === 1) return named;
+  if (named.length > 1) return named.slice(0, 6);
+  if (tokenize(query).length) {
+    return [
+      ...pickList(commerces, query, 'commerce', 4),
+      ...pickList(events, query, 'event', 2),
+      ...pickList(articles, query, 'article', 2),
+    ].slice(0, 8);
+  }
   return [];
 }

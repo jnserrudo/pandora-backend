@@ -32,9 +32,99 @@ function formatWhen(date) {
   });
 }
 
-async function loadCatalog() {
+async function loadCatalog(query = '') {
+  const q = String(query || '').trim().slice(0, 60);
+  // Ignorar palabras de intención ("mostrame", "comercios", etc.) para no achicar el catálogo
+  const INTENT_NOISE = new Set([
+    'me', 'mi', 'mis', 'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'al', 'en', 'por', 'para', 'con', 'y', 'o', 'a',
+    'que', 'que', 'hay', 'hoy', 'ahora', 'algo', 'mostrar', 'mostrame', 'mostra', 'lista', 'listame', 'ver', 'dame',
+    'quiero', 'busca', 'buscame', 'recomendame', 'recomenda', 'lugares', 'lugar', 'sitios', 'sitio', 'pandora', 'salta',
+    'comercio', 'comercios', 'local', 'locales', 'evento', 'eventos', 'agenda', 'revista', 'articulo', 'articulos',
+    'noticia', 'notas', 'magazine', 'resto', 'bar', 'cafe', 'cafeteria', 'opciones', 'algunos', 'algunas',
+  ]);
+  const tokens = q
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 2 && !INTENT_NOISE.has(t))
+    .slice(0, 4);
+
+  const useSearch = tokens.length > 0;
+
+  const commerceSearch = useSearch
+    ? {
+        OR: tokens.flatMap((token) => [
+          { name: { contains: token } },
+          { shortDescription: { contains: token } },
+          { address: { contains: token } },
+          { description: { contains: token } },
+        ]),
+      }
+    : {};
+
+  const eventSearch = useSearch
+    ? {
+        OR: tokens.flatMap((token) => [
+          { name: { contains: token } },
+          { address: { contains: token } },
+          { description: { contains: token } },
+        ]),
+      }
+    : {};
+
+  const articleSearch = useSearch
+    ? {
+        OR: tokens.flatMap((token) => [
+          { title: { contains: token } },
+          { subtitle: { contains: token } },
+        ]),
+      }
+    : {};
+
   try {
-    const [commerces, events, articles] = await Promise.all([
+    const [commerces, events, articles, baseCommerces, baseEvents, baseArticles] = await Promise.all([
+      prisma.commerce.findMany({
+        where: { status: 'ACTIVE', isActive: true, ...commerceSearch },
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          shortDescription: true,
+          address: true,
+          coverImage: true,
+          isFeatured: true,
+        },
+        take: useSearch ? 24 : 20,
+        orderBy: [{ isFeatured: 'desc' }, { planLevel: 'desc' }, { name: 'asc' }],
+      }),
+      prisma.event.findMany({
+        where: { status: 'SCHEDULED', isActive: true, ...eventSearch },
+        select: {
+          id: true,
+          name: true,
+          startDate: true,
+          address: true,
+          coverImage: true,
+          commerce: { select: { name: true } },
+        },
+        take: useSearch ? 16 : 12,
+        orderBy: [{ featured: 'desc' }, { startDate: 'asc' }],
+      }),
+      prisma.article.findMany({
+        where: { status: 'PUBLISHED', isActive: true, ...articleSearch },
+        select: {
+          title: true,
+          slug: true,
+          subtitle: true,
+          coverImage: true,
+          category: { select: { name: true } },
+        },
+        take: useSearch ? 12 : 10,
+        orderBy: { createdAt: 'desc' },
+      }),
+      // Catálogo base amplio para listados (aunque la búsqueda puntual venga vacía)
       prisma.commerce.findMany({
         where: { status: 'ACTIVE', isActive: true },
         select: {
@@ -46,7 +136,7 @@ async function loadCatalog() {
           coverImage: true,
           isFeatured: true,
         },
-        take: 12,
+        take: 20,
         orderBy: [{ isFeatured: 'desc' }, { planLevel: 'desc' }, { name: 'asc' }],
       }),
       prisma.event.findMany({
@@ -59,7 +149,7 @@ async function loadCatalog() {
           coverImage: true,
           commerce: { select: { name: true } },
         },
-        take: 10,
+        take: 12,
         orderBy: [{ featured: 'desc' }, { startDate: 'asc' }],
       }),
       prisma.article.findMany({
@@ -71,13 +161,23 @@ async function loadCatalog() {
           coverImage: true,
           category: { select: { name: true } },
         },
-        take: 8,
+        take: 10,
         orderBy: { createdAt: 'desc' },
       }),
     ]);
 
+    const mergeById = (primary, secondary) => {
+      const map = new Map();
+      [...primary, ...secondary].forEach((item) => map.set(item.id ?? item.slug, item));
+      return [...map.values()];
+    };
+
+    const mergedCommerces = mergeById(commerces, baseCommerces);
+    const mergedEvents = mergeById(events, baseEvents);
+    const mergedArticles = mergeById(articles, baseArticles);
+
     return {
-      commerces: commerces.map((item) => ({
+      commerces: mergedCommerces.map((item) => ({
         id: `commerce-${item.id}`,
         type: 'commerce',
         label: item.name,
@@ -88,7 +188,7 @@ async function loadCatalog() {
         searchText: [item.name, item.shortDescription, item.address, item.category].filter(Boolean).join(' '),
         to: `/commerce/${item.id}`,
       })),
-      events: events.map((item) => ({
+      events: mergedEvents.map((item) => ({
         id: `event-${item.id}`,
         type: 'event',
         label: item.name,
@@ -98,7 +198,7 @@ async function loadCatalog() {
         searchText: [item.name, item.address, item.commerce?.name].filter(Boolean).join(' '),
         to: `/event/${item.id}`,
       })),
-      articles: articles.map((item) => ({
+      articles: mergedArticles.map((item) => ({
         id: `article-${item.slug}`,
         type: 'article',
         label: item.title,
@@ -133,25 +233,27 @@ export const postAssistantChat = async (req, res) => {
     const role = req.user?.role || 'GUEST';
     const lastUser = [...messages].reverse().find((msg) => msg.role === 'user')?.content || '';
     const intent = detectIntent(lastUser);
-    const catalog = await loadCatalog();
+    const catalog = await loadCatalog(lastUser);
     const items = itemsFor(intent, catalog, lastUser);
     const actions = actionsFor(intent, role);
 
     const systemPrompt = `Sos el asistente de PANDORA, guía de descubrimiento local de Salta (Argentina). No es un e-commerce: no hay carrito ni pedidos.
 
 Cómo hablar:
-- Español rioplatense (vos). Cálido y concreto.
-- 2 a 5 frases. Si es un trámite, hasta 4 pasos cortos (una línea cada uno).
-- Sin markdown: nada de ** ni #.
-- Si hay tarjetas abajo, no copies la lista: presentá en 1 o 2 frases y decí que toque una ficha para ver el detalle.
-- No inventes fichas. Si no hay tarjetas, no enumeres locales de memoria.
-- Un trámite por mensaje. No mezcles registro, planes y magazine si no preguntaron eso.
+- Español rioplatense (vos). Cálido, claro y útil.
+- Respondé SIEMPRE a lo que preguntó la persona. Si es un cómo-hacer, dale pasos. Si busca un lugar o plan, usá las fichas reales.
+- 2 a 6 frases (o hasta 5 pasos cortos si es un trámite). Sin markdown: nada de ** ni #.
+- Si hay tarjetas abajo, no copies la lista entera: presentá en 1 o 2 frases y decí que toque una ficha o “Ver todos”.
+- No inventes fichas ni nombres que no estén en “Nombres de muestra”. Si no hay match, decilo y ofrecé explorar comercios/eventos/revista.
+- Podés explicar registro, login, favoritos, comentarios, planes, contacto, alta de comercio/evento y paneles según el rol.
 - Nunca escribas etiquetas think ni tu razonamiento interno. Solo el texto para la persona.
 
 ${rolePrompt(role)}
 Intención detectada: ${intent}.
 Cómo ayudar en este trámite: ${processHint(intent, role)}
 Página actual: ${page || '/'}.
+Pregunta del usuario: ${lastUser || '(vacía)'}.
+Cantidad de fichas adjuntas: ${items.length}.
 Nombres de muestra (no inventes otros): ${[
       ...catalog.commerces.map((item) => item.label),
       ...catalog.events.map((item) => item.label),
