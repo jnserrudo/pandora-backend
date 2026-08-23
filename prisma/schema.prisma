@@ -363,6 +363,10 @@ model Category {
   slug        String?    @unique
   description String?    @db.Text
   isActive    Boolean    @default(true)
+  /// Visible en los círculos de la Home
+  showOnHome  Boolean    @default(true)
+  /// Orden en Home (menor = primero)
+  homeOrder   Int        @default(0)
   commerces   Commerce[]
 
   createdAt DateTime @default(now())

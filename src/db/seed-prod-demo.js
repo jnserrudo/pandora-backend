@@ -277,12 +277,21 @@ async function seedAddOnly() {
   );
 
   const commerceCats = [
-    { name: 'Vida Nocturna', slug: 'VIDA_NOCTURNA', description: 'Bares, peñas y after de Salta' },
-    { name: 'Gastronomía', slug: 'GASTRONOMIA', description: 'Restaurantes, cafés y regional' },
-    { name: 'Salas y Teatro', slug: 'SALAS_Y_TEATRO', description: 'Teatros, salas y cultura en vivo' }
+    { name: 'Vida Nocturna', slug: 'VIDA_NOCTURNA', description: 'Bares, peñas y after de Salta', showOnHome: true, homeOrder: 1 },
+    { name: 'Gastronomía', slug: 'GASTRONOMIA', description: 'Restaurantes, cafés y regional', showOnHome: true, homeOrder: 2 },
+    { name: 'Salas y Teatro', slug: 'SALAS_Y_TEATRO', description: 'Teatros, salas y cultura en vivo', showOnHome: true, homeOrder: 3 },
   ];
   for (const cat of commerceCats) {
-    await ensure('category', { name: cat.name }, cat);
+    await prisma.category.upsert({
+      where: { name: cat.name },
+      update: {
+        slug: cat.slug,
+        description: cat.description,
+        showOnHome: cat.showOnHome,
+        homeOrder: cat.homeOrder,
+      },
+      create: cat,
+    });
   }
   const catGastro = await prisma.category.findUnique({ where: { name: 'Gastronomía' } });
   const catNight = await prisma.category.findUnique({ where: { name: 'Vida Nocturna' } });
