@@ -195,17 +195,17 @@ export function processHint(intent, role = 'GUEST') {
       ? 'Sin sesión no puede publicar. Primero cuenta, después alta: nombre, categoría, fotos. Queda PENDING hasta que un admin lo apruebe.'
       : 'Alta de comercio: nombre, categoría, descripción, dirección, fotos. Enviar solicitud. Queda PENDING. Free = 1 foto y 1 categoría.',
     create_event: role === 'OWNER' || role === 'ADMIN'
-      ? 'Eventos: se piden desde un comercio propio. Básico gratis; Plus/Premium piden comprobante. Quedan PENDING hasta el admin.'
+      ? 'Eventos: se piden desde un comercio propio. Tier Básico gratis; Plus/Premium (tiers de evento, no planes de comercio) piden comprobante. Quedan PENDING hasta el admin.'
       : 'Para pedir un evento primero tiene que tener un comercio (USER carga el local y espera validación).',
     favorite: 'Hay locales abajo para elegir. En la ficha, corazón Guardar. Hace falta sesión. Se ven en Perfil.',
     comment: 'Hay locales abajo. En la ficha, abajo, deja opinión con puntaje. El dueño (plan Plata u Oro) puede responder.',
-    plans: 'Free: 1 foto, 1 categoría. Plata: productos y respuestas. Oro: FAQs, más fotos, destacado. Se pide upgrade por contacto/comprobante, no hay carrito.',
+    plans: 'Comercio Free: 1 foto, 1 categoría. Plata: productos y respuestas. Oro: FAQs, más fotos, destacado. Platino: techo del plan. Upgrade por contacto/comprobante, no hay carrito.',
     contact: 'Contacto es el buzón: consulta, publicidad, revista o cambio de plan. Adjunto opcional. La respuesta llega a Mis solicitudes.',
     profile: 'Perfil: DNI, favoritos, cerrar sesión. Mis solicitudes es el seguimiento de trámites.',
     submissions: 'Mis solicitudes muestra contactos y cambios de plan con la respuesta del admin.',
-    owner_panel: 'OWNER edita ficha, sucursales, productos (Plata+), FAQs (Oro), responde comentarios (Plata+).',
-    admin_validate: 'Admin valida comercios y eventos PENDING, buzón y magazine. El Guard no bloquea altas: las lista para revisar qué pasó.',
-    admin_guard: 'AI Guard intercepta altas y ediciones: no las bloquea, las lista para que el admin las abra y decida.',
+    owner_panel: 'OWNER edita ficha, sucursales, productos (Plata+), FAQs (Oro+), responde comentarios (Plata+).',
+    admin_validate: 'Admin valida comercios y eventos PENDING, buzón y magazine. La moderación de contenido no bloquea altas: las lista para revisar.',
+    admin_guard: 'La moderación intercepta altas y ediciones: no las bloquea, las lista para que el admin las abra y decida.',
   };
   return hints[intent] || hints.overview;
 }

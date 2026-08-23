@@ -212,12 +212,49 @@ async function seedAddOnly() {
   );
 
   const planDefs = [
-    { level: 1, name: 'Free', price: 0, description: 'Presencia básica en el mapa de Salta', benefits: '1 foto, 1 categoría, 1 sucursal' },
-    { level: 2, name: 'Plata', price: 15000, description: 'Más visibilidad y herramientas', benefits: '10 fotos, 3 categorías, productos, sucursales, respuesta a comentarios' },
-    { level: 3, name: 'Oro', price: 30000, description: 'Máxima exposición', benefits: 'Galería amplia, FAQs, destacado, video y menú externo' }
+    {
+      level: 1,
+      name: 'Free',
+      price: 0,
+      description: 'Presencia básica en el mapa de Salta',
+      benefits: '1 foto\n1 categoría\n1 sucursal\nFicha pública con horarios y contacto',
+    },
+    {
+      level: 2,
+      name: 'Plata',
+      price: 15000,
+      description: 'Más visibilidad y herramientas',
+      benefits:
+        'Hasta 10 fotos\nHasta 3 categorías\nHasta 3 sucursales\nCatálogo de productos\nRespuesta a comentarios\nTeléfono y link externo visibles',
+    },
+    {
+      level: 3,
+      name: 'Oro',
+      price: 30000,
+      description: 'Máxima exposición',
+      benefits:
+        'Galería amplia\nFAQs en la ficha\nDestacado en listados\nVideo y menú externo\nTodo lo de Plata',
+    },
+    {
+      level: 4,
+      name: 'Platino',
+      price: 50000,
+      description: 'Socio Pandora con el techo del plan',
+      benefits:
+        'Todo lo de Oro\nLímites altos de galería y sucursales\nPrioridad en destacados\nSoporte preferencial',
+    },
   ];
   for (const plan of planDefs) {
-    await ensure('plan', { level: plan.level }, plan);
+    await prisma.plan.upsert({
+      where: { level: plan.level },
+      update: {
+        name: plan.name,
+        price: plan.price,
+        description: plan.description,
+        benefits: plan.benefits,
+      },
+      create: plan,
+    });
   }
   const planFree = await prisma.plan.findUnique({ where: { level: 1 } });
   const planPlata = await prisma.plan.findUnique({ where: { level: 2 } });
