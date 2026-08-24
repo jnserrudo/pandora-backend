@@ -29,7 +29,7 @@ export const markAsRead = async (req, res) => {
             resourceId: updated.id,
             oldData: { isRead: false },
             newData: { isRead: true, type: updated.type, referenceId: updated.referenceId },
-            ipAddress: req.ip,
+            req
         });
         res.status(200).json({ success: true });
     } catch (error) {
@@ -50,7 +50,7 @@ export const markAllAsRead = async (req, res) => {
             resourceId: req.user.id,
             oldData: { scope: 'all_unread' },
             newData: { markedRead: result.count ?? true },
-            ipAddress: req.ip,
+            req
         });
         res.status(200).json({ success: true });
     } catch (error) {
@@ -72,7 +72,7 @@ export const deleteNotification = async (req, res) => {
             resourceId: deleted.id,
             oldData: deleted,
             newData: null,
-            ipAddress: req.ip,
+            req
         });
         res.status(200).json({ success: true });
     } catch (error) {
@@ -93,7 +93,7 @@ export const clearAllNotifications = async (req, res) => {
             resourceId: req.user.id,
             oldData: { clearedCount: count, sample: snapshot },
             newData: { clearedCount: count },
-            ipAddress: req.ip,
+            req
         });
         res.status(200).json({ success: true });
     } catch (error) {

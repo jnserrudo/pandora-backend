@@ -133,8 +133,8 @@ export const replySubmission = async (req, res) => {
                     resourceId: commerce.id,
                     oldData: { planLevel: commerce.planLevel },
                     newData: { planLevel: newLevel, planHistoryId: historyEntry?.id || null },
-                    ipAddress: req.ip
-                });
+                    req
+        });
             }
         }
 

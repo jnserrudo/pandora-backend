@@ -49,7 +49,7 @@ export const createArticle = async (req, res) => {
             resourceType: 'ARTICLE',
             resourceId: article.id,
             newData: article,
-            ipAddress: req.ip
+            req
         });
 
         res.status(201).json(article);
@@ -72,7 +72,7 @@ export const updateArticle = async (req, res) => {
             resourceId: updatedArticle.id,
             oldData: oldArticle,
             newData: updatedArticle,
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json(updatedArticle);
@@ -94,7 +94,7 @@ export const deleteArticle = async (req, res) => {
             resourceType: 'ARTICLE',
             resourceId: parseInt(id),
             oldData: oldArticle,
-            ipAddress: req.ip
+            req
         });
 
         res.status(204).send();

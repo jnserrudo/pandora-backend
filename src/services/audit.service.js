@@ -1,16 +1,36 @@
 import prisma from '../db/prismaClient.js';
 
 /**
+ * Resuelve el origen del cliente desde headers (X-Client-Platform) o User-Agent.
+ * @returns {'WEB'|'MOBILE'|'UNKNOWN'}
+ */
+export const resolveClientSource = (req) => {
+    if (!req) return 'UNKNOWN';
+    const header =
+        req.headers?.['x-client-platform'] ||
+        req.headers?.['X-Client-Platform'] ||
+        (typeof req.get === 'function' ? req.get('x-client-platform') : null) ||
+        '';
+    const raw = String(header).trim().toLowerCase();
+    if (raw === 'mobile' || raw === 'app' || raw === 'flutter' || raw === 'android' || raw === 'ios') {
+        return 'MOBILE';
+    }
+    if (raw === 'web' || raw === 'browser') {
+        return 'WEB';
+    }
+    const ua = String(req.headers?.['user-agent'] || '').toLowerCase();
+    if (ua.includes('dart') || ua.includes('flutter') || ua.includes('okhttp')) {
+        return 'MOBILE';
+    }
+    if (ua) return 'WEB';
+    return 'UNKNOWN';
+};
+
+/**
  * Registra una acción en la auditoría del sistema.
- * 
- * @param {Object} params - Parámetros del log
- * @param {number|null} params.userId - ID del usuario que realiza la acción
- * @param {string} params.action - Acción realizada ('CREATE', 'UPDATE', 'DELETE', 'STATUS_CHANGE', etc.)
- * @param {string} params.resourceType - Tipo de entidad afectada ('COMMERCE', 'USER', 'ARTICLE', etc.)
- * @param {number|string} params.resourceId - ID de la entidad afectada
- * @param {Object|null} params.oldData - Snapshot de los datos ANTES de la acción
- * @param {Object|null} params.newData - Snapshot de los datos DESPUÉS de la acción
- * @param {string|null} params.ipAddress - Dirección IP del solicitante
+ *
+ * @param {Object} params
+ * @param {import('express').Request} [params.req] - Si se pasa, rellena ipAddress y clientSource
  */
 export const createLog = async ({
     userId,
@@ -19,17 +39,23 @@ export const createLog = async ({
     resourceId,
     oldData = null,
     newData = null,
-    ipAddress = null
+    ipAddress = null,
+    clientSource = null,
+    req = null,
 }) => {
     try {
-        // Sanitizar datos sensibles (ej. contraseñas) antes de guardar
         const sanitize = (data) => {
             if (!data) return null;
             const clean = { ...data };
             const sensitiveKeys = ['password', 'token', 'refreshToken', 'secret'];
-            sensitiveKeys.forEach(key => delete clean[key]);
+            sensitiveKeys.forEach((key) => delete clean[key]);
             return clean;
         };
+
+        const resolvedIp = ipAddress ?? req?.ip ?? null;
+        const resolvedSource = String(
+            clientSource || resolveClientSource(req) || 'UNKNOWN'
+        ).toUpperCase();
 
         const log = await prisma.auditLog.create({
             data: {
@@ -39,12 +65,12 @@ export const createLog = async ({
                 resourceId: resourceId ? parseInt(resourceId) : null,
                 oldData: sanitize(oldData),
                 newData: sanitize(newData),
-                ipAddress
-            }
+                ipAddress: resolvedIp,
+                clientSource: resolvedSource,
+            },
         });
         return log;
     } catch (error) {
-        // Fallback silencioso para no romper la transacción principal si la auditoría falla
         console.error('[AUDIT] Error crítico guardando log de auditoría:', error.message);
         return null;
     }

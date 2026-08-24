@@ -40,7 +40,7 @@ export const createAdvertisement = async (req, res) => {
             resourceType: 'ADVERTISEMENT',
             resourceId: newAd.id,
             newData: newAd,
-            ipAddress: req.ip
+            req
         });
 
         res.status(201).json(newAd);
@@ -62,7 +62,7 @@ export const updateAdvertisement = async (req, res) => {
             resourceId: updatedAd.id,
             oldData: oldAd,
             newData: updatedAd,
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json(updatedAd);
@@ -83,7 +83,7 @@ export const deleteAdvertisement = async (req, res) => {
             resourceType: 'ADVERTISEMENT',
             resourceId: parseInt(req.params.id),
             oldData: oldAd,
-            ipAddress: req.ip
+            req
         });
 
         res.status(204).send();

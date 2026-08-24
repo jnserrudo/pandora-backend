@@ -519,6 +519,7 @@ model AuditLog {
   oldData      Json? // Estado ANTES del cambio
   newData      Json? // Estado DESPUÉS del cambio
   ipAddress    String? // Metadata de conexión
+  clientSource String? // 'WEB' | 'MOBILE' | 'UNKNOWN' — origen del cliente
   createdAt    DateTime @default(now())
 }
 

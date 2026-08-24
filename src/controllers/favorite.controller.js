@@ -12,7 +12,7 @@ export const toggleFavorite = async (req, res) => {
             resourceId,
             oldData: result.favorited ? null : { resourceType, resourceId, favorited: true },
             newData: result.favorited ? { resourceType, resourceId, favorited: true } : null,
-            ipAddress: req.ip,
+            req
         });
         res.status(200).json(result);
     } catch (error) {

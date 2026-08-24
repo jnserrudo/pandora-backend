@@ -85,7 +85,7 @@ export const createCommerce = async (req, res) => {
             resourceType: 'COMMERCE',
             resourceId: commerce.id,
             newData: commerce,
-            ipAddress: req.ip
+            req
         });
 
         res.status(201).json(commerce);
@@ -121,7 +121,7 @@ export const validateCommerce = async (req, res) => {
             resourceId: commerce.id,
             oldData: oldCommerce,
             newData: commerce,
-            ipAddress: req.ip
+            req
         });
 
         // Notificar al dueño
@@ -187,7 +187,7 @@ export const updateCommerce = async (req, res) => {
             resourceId: updatedCommerce.id,
             oldData: oldCommerce,
             newData: updatedCommerce,
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json(updatedCommerce);

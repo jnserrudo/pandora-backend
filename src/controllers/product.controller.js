@@ -61,7 +61,7 @@ export const createProduct = async (req, res) => {
             resourceType: 'PRODUCT',
             resourceId: product.id,
             newData: product,
-            ipAddress: req.ip
+            req
         });
 
         res.status(201).json(product);
@@ -90,7 +90,7 @@ export const deleteProduct = async (req, res) => {
             resourceType: 'PRODUCT',
             resourceId: parseInt(id),
             oldData: oldProduct,
-            ipAddress: req.ip
+            req
         });
 
         res.status(204).send();

@@ -56,7 +56,7 @@ export const createCategory = async (req, res) => {
       resourceType: 'CATEGORY',
       resourceId: category.id,
       newData: category,
-      ipAddress: req.ip,
+      req
     });
 
     res.status(201).json(category);
@@ -99,7 +99,7 @@ export const updateCategory = async (req, res) => {
       resourceId: category.id,
       oldData: oldCategory,
       newData: category,
-      ipAddress: req.ip,
+      req
     });
 
     res.status(200).json(category);
@@ -148,7 +148,7 @@ export const updateHomeCategories = async (req, res) => {
       resourceType: 'CATEGORY',
       resourceId: 0,
       newData: { homeConfig: updated.map((c) => ({ id: c.id, showOnHome: c.showOnHome, homeOrder: c.homeOrder })) },
-      ipAddress: req.ip,
+      req
     });
 
     res.status(200).json(updated);
@@ -179,7 +179,7 @@ export const deleteCategory = async (req, res) => {
       resourceType: 'CATEGORY',
       resourceId: parseInt(id, 10),
       oldData: oldCategory,
-      ipAddress: req.ip,
+      req
     });
 
     res.status(204).send();

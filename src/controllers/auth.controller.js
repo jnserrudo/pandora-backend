@@ -73,7 +73,7 @@ export const registerUser = async (req, res) => {
             resourceType: 'USER',
             resourceId: newUser.id,
             newData: newUser,
-            ipAddress: req.ip
+            req
         });
         
         console.log(`[AUTH] ==========================================`);
@@ -140,7 +140,7 @@ export const resendOTP = async (req, res) => {
             resourceType: 'USER',
             resourceId: user.id,
             newData: { emailSent, hasError: !!emailError },
-            ipAddress: req.ip
+            req
         });
     } catch (error) {
         console.error('[AUTH] Error:', error.message);
@@ -167,7 +167,7 @@ export const loginUser = async (req, res) => {
             action: 'LOGIN',
             resourceType: 'USER',
             resourceId: user?.id,
-            ipAddress: req.ip
+            req
         });
     } catch (error) {
         console.error('[AUTH] Error:', error.message);

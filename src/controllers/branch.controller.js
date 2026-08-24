@@ -54,7 +54,7 @@ export const createBranch = async (req, res) => {
             resourceType: 'BRANCH',
             resourceId: branch.id,
             newData: branch,
-            ipAddress: req.ip
+            req
         });
 
         res.status(201).json(branch);
@@ -81,7 +81,7 @@ export const deleteBranch = async (req, res) => {
             resourceType: 'BRANCH',
             resourceId: Number(id),
             oldData: oldBranch,
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json({ message: 'Sucursal eliminada' });

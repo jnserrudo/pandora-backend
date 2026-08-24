@@ -23,8 +23,8 @@ export const createCoupon = async (req, res) => {
         resourceType: 'COUPON',
         resourceId: created.id,
         newData: created,
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(201).json(created);
   } catch (error) {
@@ -45,8 +45,8 @@ export const updateCoupon = async (req, res) => {
         resourceId: updated.id,
         oldData: oldCoupon,
         newData: updated,
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(200).json(updated);
   } catch (error) {
@@ -66,8 +66,8 @@ export const deleteCoupon = async (req, res) => {
         resourceType: 'COUPON',
         resourceId: parseInt(req.params.id),
         oldData: oldCoupon,
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(204).send();
   } catch (error) {

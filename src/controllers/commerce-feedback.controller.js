@@ -93,8 +93,8 @@ export const updateComment = async (req, res) => {
         resourceId: comment.id,
         oldData: oldComment,
         newData: comment,
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(200).json(comment);
   } catch (error) {
@@ -140,8 +140,8 @@ export const replyComment = async (req, res) => {
         resourceId: updatedComment.id,
         oldData: { commerceReply: oldComment.commerceReply },
         newData: { commerceReply },
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(200).json(updatedComment);
   } catch (error) {
@@ -165,8 +165,8 @@ export const deleteComment = async (req, res) => {
         resourceType: 'COMMENT',
         resourceId: parseInt(id),
         oldData: oldComment,
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(204).send();
   } catch (error) {
@@ -271,8 +271,8 @@ export const updateAdvisoryStatus = async (req, res) => {
         resourceId: updatedAdvisory.id,
         oldData: { status: oldAdvisory.status },
         newData: { status },
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(200).json(updatedAdvisory);
   } catch (error) {
@@ -331,8 +331,8 @@ export const setCommerceFeatured = async (req, res) => {
         resourceId: commerce.id,
         oldData: oldCommerce,
         newData: { isFeatured: commerce.isFeatured, featuredUntil: commerce.featuredUntil },
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(200).json(commerce);
   } catch (error) {

@@ -169,7 +169,7 @@ export const adminUpdateUser = async (req, res) => {
             resourceId: targetId,
             oldData: { role: oldUser.role, isActive: oldUser.isActive },
             newData: { role: updatedUser.role, isActive: updatedUser.isActive },
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json(updatedUser);
@@ -209,7 +209,7 @@ export const updateMyProfile = async (req, res) => {
             resourceId: req.user.id,
             oldData: oldUser,
             newData: updatedUser,
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json(updatedUser);

@@ -79,7 +79,7 @@ export const createEvent = async (req, res) => {
             resourceType: 'EVENT',
             resourceId: event.id,
             newData: event,
-            ipAddress: req.ip
+            req
         });
 
         // Notificar admins si queda pendiente de validación
@@ -112,7 +112,7 @@ export const updateEvent = async (req, res) => {
             resourceId: updatedEvent.id,
             oldData: oldEvent,
             newData: updatedEvent,
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json(updatedEvent);
@@ -135,7 +135,7 @@ export const deleteEvent = async (req, res) => {
             resourceType: 'EVENT',
             resourceId: parseInt(id),
             oldData: oldEvent,
-            ipAddress: req.ip
+            req
         });
 
         res.status(204).send();
@@ -174,7 +174,7 @@ export const approveEvent = async (req, res) => {
             resourceId: updatedEvent.id,
             oldData: { status: oldEvent.status },
             newData: { status: updatedEvent.status },
-            ipAddress: req.ip
+            req
         });
         try {
             await notifyOwnerEventDecision(id, true);
@@ -204,7 +204,7 @@ export const rejectEvent = async (req, res) => {
             resourceId: updatedEvent.id,
             oldData: { status: oldEvent.status },
             newData: { status: updatedEvent.status, adminNote },
-            ipAddress: req.ip
+            req
         });
         try {
             await notifyOwnerEventDecision(id, false, adminNote);
@@ -234,7 +234,7 @@ export const validateEventPayment = async (req, res) => {
             resourceId: updatedEvent.id,
             oldData: { paymentStatus: oldEvent.paymentStatus },
             newData: { paymentStatus: updatedEvent.paymentStatus },
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json(updatedEvent);

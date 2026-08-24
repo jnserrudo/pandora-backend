@@ -24,8 +24,8 @@ export const updatePlan = async (req, res) => {
         resourceId: updated.id,
         oldData: oldPlan,
         newData: updated,
-        ipAddress: req.ip
-    });
+        req
+        });
 
     res.status(200).json(updated);
   } catch (error) {

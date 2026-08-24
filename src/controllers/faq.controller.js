@@ -44,7 +44,7 @@ export const createFAQ = async (req, res) => {
             resourceType: 'FAQ',
             resourceId: faq.id,
             newData: faq,
-            ipAddress: req.ip
+            req
         });
 
         res.status(201).json(faq);
@@ -81,7 +81,7 @@ export const updateFAQ = async (req, res) => {
             resourceId: faq.id,
             oldData: oldFaq,
             newData: faq,
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json(faq);
@@ -115,7 +115,7 @@ export const deleteFAQ = async (req, res) => {
             resourceType: 'FAQ',
             resourceId: parseInt(id),
             oldData: oldFaq,
-            ipAddress: req.ip
+            req
         });
 
         res.status(200).json({ message: 'FAQ eliminada exitosamente' });
