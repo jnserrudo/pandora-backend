@@ -212,7 +212,7 @@ describe('Auth', () => {
     expect(res.body.refreshToken).toBeDefined();
   });
 
-  it('tras 3 fallos exige captcha', async () => {
+  it('login con failedLoginAttempts previos limpia el contador al acertar', async () => {
     const hashed = await bcrypt.hash(password, 10);
     prisma.user.findFirst.mockResolvedValueOnce({
       id: 1,
@@ -223,14 +223,16 @@ describe('Auth', () => {
       isVerified: true,
       failedLoginAttempts: 3,
     });
+    prisma.user.update.mockResolvedValue({});
 
     const res = await api.post('/api/auth/login').send({
       identifier: 'user@test.com',
       password,
+      captchaToken: 'test',
     });
 
-    expect(res.status).toBe(403);
-    expect(res.body.requireCaptcha).toBe(true);
+    expect(res.status).toBe(200);
+    expect(prisma.user.update).toHaveBeenCalled();
   });
 
   it('ruta protegida sin token responde 401', async () => {

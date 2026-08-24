@@ -68,20 +68,19 @@ export const registerUserService = async (userData) => {
 
 export const loginUserService = async (identifier, password, captchaToken) => {
   const normalizedIdentifier = identifier.toLowerCase().trim();
+
+  // Captcha siempre (en test / SKIP_CAPTCHA / dev sin secret el util lo saltea)
+  const isValidCaptcha = await verifyTurnstileToken(captchaToken);
+  if (!isValidCaptcha) {
+    throwError("Completá el captcha para entrar.", 400, { requireCaptcha: true });
+  }
+
   const user = await prisma.user.findFirst({
     where: { OR: [{ email: normalizedIdentifier }, { username: normalizedIdentifier }] },
   });
 
   if (!user) {
     throwError("Credenciales inválidas.", 401);
-  }
-
-  if (user.failedLoginAttempts >= 3) {
-    if (!captchaToken) {
-      throwError("Demasiados intentos fallidos. Completa el captcha.", 403, { requireCaptcha: true });
-    }
-    const isValid = await verifyTurnstileToken(captchaToken);
-    if (!isValid) throwError("Captcha inválido.", 400);
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
